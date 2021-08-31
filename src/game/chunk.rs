@@ -52,7 +52,7 @@ impl Chunk {
         self.need_update[index] = true;
     }
 
-    pub fn calculate(&mut self, calculator: &Mutex<Calculator>) -> ChunkCalculation {
+    pub fn calculate(&mut self, calculator: &Mutex<Calculator>) -> Box<ChunkCalculation> {
         println!("Calculating");
         let mut calculation = ChunkCalculation {
             checked: data_array(false),
@@ -124,7 +124,7 @@ impl Chunk {
         // }
 
         println!("Returning value");
-        calculation
+        Box::new(calculation)
     }
 
     fn calculate_tile(
