@@ -5,3 +5,8 @@ pub struct Tile {
     pub chunk_pos: IVec2,
     pub index: usize,
 }
+
+#[derive(Clone, Debug)]
+pub enum TileInfo {
+    Sand,
+}

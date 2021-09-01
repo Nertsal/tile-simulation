@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y},
+    game::tile::TileInfo,
     update_view::UpdateView,
 };
 
@@ -10,7 +11,7 @@ mod calculator;
 mod chunk;
 mod renderer;
 mod tick;
-mod tile;
+pub mod tile;
 
 use chunk::{tile_index_to_position, Chunk};
 use renderer::Renderer;
@@ -26,13 +27,13 @@ impl Game {
         let mut game = Self {
             chunks: {
                 let mut chunks = HashMap::new();
-                const CHUNKS: i32 = 0;
+                const CHUNKS: i32 = 1;
                 for x in -CHUNKS..=CHUNKS {
                     for y in 0..=CHUNKS * 2 {
                         let pos = ivec2(x, y);
                         let mut chunk = Chunk::empty(pos);
-                        for tile in 0..1 {
-                            chunk.set_tile(tile);
+                        for tile in 0..5 {
+                            chunk.set_tile(tile, Some(TileInfo::Sand));
                         }
                         chunks.insert(pos, chunk);
                     }
@@ -47,11 +48,11 @@ impl Game {
             game.chunks
                 .iter()
                 .map(|(&chunk_pos, chunk)| {
-                    chunk.tiles().map(move |(index, &tile)| {
+                    chunk.tiles().map(move |(index, tile)| {
                         (
                             tile_index_to_position(index)
                                 + chunk_pos * ivec2(CHUNK_SIZE_X as i32, CHUNK_SIZE_Y as i32),
-                            tile,
+                            tile.clone(),
                         )
                     })
                 })

@@ -8,6 +8,8 @@ use macroquad::{
 
 use crate::update_view::UpdateView;
 
+use super::tile::TileInfo;
+
 pub struct Renderer {
     game_camera: Camera2D,
     image: Image,
@@ -43,7 +45,7 @@ impl Renderer {
         // let offset = self.game_camera.world_to_screen(vec2(0.0, 0.0));
         // let offset = ivec2(offset.x as i32, offset.y as i32);
         let offset = ivec2(self.image.width as i32 / 2, 0);
-        for (pos, tile) in view.tiles() {
+        for (pos, tile) in view.into_tiles() {
             let pos = pos + offset;
             if pos.x >= 0
                 && pos.x < self.image.width as i32
@@ -51,11 +53,13 @@ impl Renderer {
                 && pos.y < self.image.height as i32
             {
                 match tile {
-                    true => {
-                        let color = WHITE; // tile_color(&tile);
-                        self.image.set_pixel(pos.x as u32, pos.y as u32, color);
-                    }
-                    false => self.image.set_pixel(pos.x as u32, pos.y as u32, BLACK),
+                    None => self.image.set_pixel(pos.x as u32, pos.y as u32, BLACK),
+                    Some(tile_info) => match tile_info {
+                        TileInfo::Sand => {
+                            let color = WHITE; // tile_color(&tile);
+                            self.image.set_pixel(pos.x as u32, pos.y as u32, color);
+                        }
+                    },
                 }
             }
         }
