@@ -1,48 +1,153 @@
 use macroquad::prelude::IVec2;
-use std::collections::{HashMap, HashSet};
+use rayon::prelude::*;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
 
 use super::{
-    chunk::{data_array, default_data_array, DataArray, MoveInfo},
+    chunk::{
+        data_array, default_data_array, Chunk, ChunkCalculation, DataArray, Dependencies, MoveInfo,
+    },
     tile::{Tile, TileInfo},
 };
 
+type ChunkInformation<'a, 'b> = (
+    &'b mut &'a mut Chunk,
+    ChunkCalculation,
+    Dependencies,
+    Option<DataArray<bool>>,             // Extra updates
+    Option<DataArray<Option<TileInfo>>>, // Cross-chunk moves
+);
+
+pub type ViewUpdates = HashMap<IVec2, DataArray<Option<Option<TileInfo>>>>;
+
 pub struct Calculator {
-    calculations: HashMap<IVec2, DataArray<MoveInfo>>,
+    chunk_calculations: HashMap<IVec2, DataArray<MoveInfo>>,
     extra_updates: HashMap<IVec2, DataArray<bool>>,
     cross_moves: HashMap<IVec2, DataArray<Option<TileInfo>>>,
-    chunks: usize,
-    updated: HashSet<IVec2>,
+    calculations: HashMap<IVec2, (ChunkCalculation, Dependencies)>,
+    update_queue: HashSet<IVec2>,
 }
 
 impl Calculator {
     pub fn new(chunk_positions: impl Iterator<Item = IVec2>) -> Self {
-        let calculations = chunk_positions
-            .map(|pos| (pos, data_array(MoveInfo::Unknown)))
-            .collect::<HashMap<_, _>>();
+        let mut update_queue = HashSet::new();
+        let mut extra_updates = HashMap::new();
+        let mut cross_moves = HashMap::new();
+        let mut chunk_calculations = HashMap::new();
+        for chunk_pos in chunk_positions {
+            update_queue.insert(chunk_pos);
+            extra_updates.insert(chunk_pos, data_array(false));
+            cross_moves.insert(chunk_pos, default_data_array());
+            chunk_calculations.insert(chunk_pos, data_array(MoveInfo::Unknown));
+        }
+        let calculations = HashMap::with_capacity(chunk_calculations.len());
+
         Self {
-            extra_updates: HashMap::new(),
-            cross_moves: HashMap::new(),
-            chunks: calculations.len(),
-            updated: HashSet::new(),
+            extra_updates,
+            cross_moves,
             calculations,
+            chunk_calculations,
+            update_queue,
         }
     }
 
-    pub fn is_done(&self) -> bool {
-        self.updated.len() == self.chunks
+    pub fn tick(&mut self, mut chunks: HashMap<IVec2, &mut Chunk>) -> ViewUpdates {
+        let time = std::time::Instant::now();
+
+        // Prepare chunks for calculation
+        self.prepare_chunks(chunks.values_mut().collect());
+
+        println!("prepared in {}ms", time.elapsed().as_millis());
+
+        // Update chunks, while there are any updates queued
+        while !self.update_queue.is_empty() {
+            println!("Cycle");
+            // Get chunks to update
+            let update_queue = chunks
+                .iter_mut()
+                .filter_map(|(chunk_pos, chunk)| {
+                    if self.update_queue.remove(chunk_pos) {
+                        let (calculation, dependencies) =
+                            self.calculations.remove(chunk_pos).unwrap();
+                        let (extra_updates, cross_moves) = self.take_updates_moves(chunk_pos);
+                        Some((chunk, calculation, dependencies, extra_updates, cross_moves))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            // Update chunks
+            self.update_chunks(update_queue.into_par_iter());
+        }
+
+        println!("calculated in {}ms", time.elapsed().as_millis());
+
+        // Perform movement and collect view updates
+        let mut view_update = HashMap::with_capacity(self.calculations.len());
+        for (chunk_pos, chunk) in &mut chunks {
+            let (calculation, _) = self.calculations.remove(chunk_pos).unwrap();
+            chunk.movement(calculation.moves_to);
+            view_update.insert(*chunk_pos, calculation.view_update);
+        }
+
+        println!("tick in {}ms", time.elapsed().as_millis());
+
+        view_update
     }
 
-    pub fn update(
+    fn prepare_chunks<'a>(&mut self, update_queue: Vec<&mut &'a mut Chunk>) {
+        // Prepare chunks for calculation
+        for chunk in update_queue {
+            let (calculation, dependencies) = chunk.prepare_calculation();
+            self.calculations
+                .insert(chunk.chunk_pos, (calculation, dependencies));
+        }
+    }
+
+    fn update_chunks<'a: 'b, 'b>(
+        &mut self,
+        update_chunks: impl ParallelIterator<Item = ChunkInformation<'a, 'b>>,
+    ) {
+        // Update chunks in parallel
+        let calculator = Mutex::new(self);
+        update_chunks.for_each(
+            |(chunk, mut calculation, mut dependencies, updates, cross_moves)| {
+                // Calculation cycle is independent from other chunks
+                let (chunk_updates, extra_updates, cross_moves) = chunk.calculation_cycle(
+                    &mut calculation,
+                    &mut dependencies,
+                    updates,
+                    cross_moves,
+                );
+
+                // Update information about chunk
+                let mut calculator = calculator.lock().unwrap();
+                calculator.update_information(
+                    chunk.chunk_pos,
+                    chunk_updates,
+                    extra_updates,
+                    cross_moves,
+                    &mut dependencies,
+                );
+
+                calculator
+                    .calculations
+                    .insert(chunk.chunk_pos, (calculation, dependencies));
+            },
+        );
+    }
+
+    fn update_information(
         &mut self,
         chunk_pos: IVec2,
         chunk_updates: DataArray<Option<MoveInfo>>,
         extra_updates: Vec<Tile>,
         cross_moves: HashMap<Tile, TileInfo>,
         dependencies: &mut HashMap<Tile, MoveInfo>,
-    ) -> (Option<DataArray<bool>>, Option<DataArray<Option<TileInfo>>>) {
-        // Assume this chunk has not finished updating
-        self.updated.remove(&chunk_pos);
-
+    ) {
         // Queue updates for other chunks
         for update_tile in
             extra_updates
@@ -56,24 +161,24 @@ impl Calculator {
                         }),
                 )
         {
-            let updates = self
-                .extra_updates
-                .entry(update_tile.chunk_pos)
-                .or_insert_with(|| data_array(false));
-            updates[update_tile.index] = true;
+            if let Some(updates) = self.extra_updates.get_mut(&update_tile.chunk_pos) {
+                updates[update_tile.index] = true;
+                // Queue chunk update
+                self.update_queue.insert(update_tile.chunk_pos);
+            }
         }
 
         // Register cross moves
         for (cross_tile, cross_tile_info) in cross_moves {
-            let cross_moves = self
-                .cross_moves
-                .entry(cross_tile.chunk_pos)
-                .or_insert_with(|| default_data_array());
-            cross_moves[cross_tile.index] = Some(cross_tile_info);
+            if let Some(cross_moves) = self.cross_moves.get_mut(&cross_tile.chunk_pos) {
+                cross_moves[cross_tile.index] = Some(cross_tile_info);
+                // Queue chunk update
+                self.update_queue.insert(cross_tile.chunk_pos);
+            }
         }
 
         // Find or create chunk's calculation
-        let tiles = self.calculations.get_mut(&chunk_pos).unwrap();
+        let tiles = self.chunk_calculations.get_mut(&chunk_pos).unwrap();
 
         // Update this chunk's calculation
         for (index, update) in chunk_updates
@@ -85,26 +190,35 @@ impl Calculator {
         }
 
         // Update dependencies
-        let mut updated = false;
+        let mut need_update = false;
         for (tile, move_info) in dependencies {
             if let MoveInfo::Unknown = *move_info {
-                *move_info = match self.calculations.get(&tile.chunk_pos) {
+                *move_info = match self.chunk_calculations.get(&tile.chunk_pos) {
                     Some(calculation) => calculation[tile.index],
                     None => MoveInfo::Impossible,
                 };
-                updated = true;
+                need_update = true;
             }
         }
 
-        // This chunk has not received new updates
-        if !updated {
-            self.updated.insert(chunk_pos);
+        // If need_update, then queue update
+        if need_update {
+            self.update_queue.insert(chunk_pos);
         }
+    }
 
-        // Return updates from other chunks
+    
+    fn take_updates_moves(
+        &mut self,
+        chunk_pos: &IVec2,
+    ) -> (Option<DataArray<bool>>, Option<DataArray<Option<TileInfo>>>) {
         (
-            self.extra_updates.remove(&chunk_pos),
-            self.cross_moves.remove(&chunk_pos),
+            self.extra_updates
+                .get_mut(&chunk_pos)
+                .map(|extra_updates| std::mem::replace(extra_updates, data_array(false))),
+            self.cross_moves
+                .get_mut(&chunk_pos)
+                .map(|cross_moves| std::mem::replace(cross_moves, default_data_array())),
         )
     }
 }
