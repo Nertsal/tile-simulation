@@ -7,7 +7,7 @@ mod update_view;
 use game::Game;
 
 const FIXED_DELTA_TIME: f32 = 1.0 / 30.0;
-const MAX_UPDATES_PER_FRAME: usize = 1;
+const MAX_UPDATES_PER_FRAME: usize = 5;
 
 #[macroquad::main("Tile Physics")]
 async fn main() {

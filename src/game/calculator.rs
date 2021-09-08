@@ -54,16 +54,11 @@ impl Calculator {
     }
 
     pub fn tick(&mut self, mut chunks: HashMap<IVec2, &mut Chunk>) -> ViewUpdates {
-        let time = std::time::Instant::now();
-
         // Prepare chunks for calculation
         self.prepare_chunks(chunks.values_mut().collect());
 
-        println!("prepared in {}ms", time.elapsed().as_millis());
-
         // Update chunks, while there are any updates queued
         while !self.update_queue.is_empty() {
-            println!("Cycle");
             // Get chunks to update
             let update_queue = chunks
                 .iter_mut()
@@ -83,8 +78,6 @@ impl Calculator {
             self.update_chunks(update_queue.into_par_iter());
         }
 
-        println!("calculated in {}ms", time.elapsed().as_millis());
-
         // Perform movement and collect view updates
         let mut view_update = HashMap::with_capacity(self.calculations.len());
         for (chunk_pos, chunk) in &mut chunks {
@@ -93,18 +86,18 @@ impl Calculator {
             view_update.insert(*chunk_pos, calculation.view_update);
         }
 
-        println!("tick in {}ms", time.elapsed().as_millis());
-
         view_update
     }
 
     fn prepare_chunks<'a>(&mut self, update_queue: Vec<&mut &'a mut Chunk>) {
         // Prepare chunks for calculation
-        for chunk in update_queue {
-            let (calculation, dependencies) = chunk.prepare_calculation();
-            self.calculations
-                .insert(chunk.chunk_pos, (calculation, dependencies));
-        }
+        let calculations = Mutex::new(&mut self.calculations);
+        update_queue
+            .into_par_iter()
+            .map(|chunk| (chunk.chunk_pos, chunk.prepare_calculation()))
+            .for_each(|(chunk_pos, calculation)| {
+                calculations.lock().unwrap().insert(chunk_pos, calculation);
+            });
     }
 
     fn update_chunks<'a: 'b, 'b>(
@@ -207,7 +200,6 @@ impl Calculator {
         }
     }
 
-    
     fn take_updates_moves(
         &mut self,
         chunk_pos: &IVec2,
