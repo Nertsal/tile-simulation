@@ -91,7 +91,11 @@ impl Game {
 
     fn set_tile(&mut self, tile: Tile, tile_info: Option<TileInfo>) {
         if let Some(chunk) = self.chunks.get_mut(&tile.chunk_pos) {
-            chunk.set_tile(tile.index, tile_info.clone());
+            for extra_update in chunk.set_tile(tile.index, tile_info.clone()) {
+                if let Some(chunk) = self.chunks.get_mut(&extra_update.chunk_pos) {
+                    chunk.queue_update(extra_update.index);
+                }
+            }
             self.view_update
                 .update_tile(tile.global_position(), tile_info);
         }

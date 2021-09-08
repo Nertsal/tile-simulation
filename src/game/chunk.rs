@@ -65,10 +65,16 @@ impl Chunk {
         self.tile_info.iter().enumerate()
     }
 
-    pub fn set_tile(&mut self, index: usize, tile_info: Option<TileInfo>) {
+    pub fn set_tile(&mut self, index: usize, tile_info: Option<TileInfo>) -> Vec<Tile> {
         self.need_update[index] = tile_info.is_some();
+        self.tiles[index] = tile_info.is_some();
         self.tile_info[index] = tile_info;
-        self.tiles[index] = true;
+        self.cant_move[index] = false;
+        self.queue_updates_around(index, 1)
+    }
+
+    pub fn queue_update(&mut self, index: usize) {
+        self.need_update[index] = true;
         self.cant_move[index] = false;
     }
 
@@ -286,6 +292,27 @@ impl Chunk {
         self.cant_move[update_index] = true;
         self.need_update[update_index] = false;
         MoveInfo::Impossible
+    }
+
+    fn queue_updates_around(&mut self, index: usize, distance: i32) -> Vec<Tile> {
+        let mut extra_updates = Vec::new();
+        // Queue updates in a square around a given tile
+        for dx in -distance..=distance {
+            for dy in -distance..=distance {
+                let shift = ivec2(dx, dy);
+                match self.shift_position(index, shift) {
+                    Ok(index) => {
+                        if self.tiles[index] {
+                            self.queue_update(index);
+                        }
+                    }
+                    Err(tile) => {
+                        extra_updates.push(tile);
+                    }
+                }
+            }
+        }
+        extra_updates
     }
 
     fn update_tiles_around(
