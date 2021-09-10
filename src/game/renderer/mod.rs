@@ -77,9 +77,9 @@ impl Renderer {
     }
 
     fn draw_chunks(&self) {
-        const CHUNKS: i32 = 3;
+        const CHUNKS: i32 = 1;
         for x in -CHUNKS..=CHUNKS {
-            for y in -CHUNKS..CHUNKS {
+            for y in 0..=CHUNKS * 2 {
                 let pos = ivec2(x, y);
                 self.draw_chunk(pos);
             }
