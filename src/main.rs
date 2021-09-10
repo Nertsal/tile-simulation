@@ -1,38 +1,52 @@
 use macroquad::prelude::*;
-use std::time::Instant;
 
+mod constants;
 mod game;
+mod update_view;
 
-use game::*;
+use game::Game;
 
-const FIXED_DELTA_TIME: f32 = 1.0 / 60.0;
+const FIXED_DELTA_TIME: f32 = 1.0 / 30.0;
+const MAX_UPDATES_PER_FRAME: usize = 5;
 
-#[macroquad::main("Tile Simulation")]
+#[macroquad::main("Tile Physics")]
 async fn main() {
     let mut game = Game::new();
+
     let mut frame_time = 0.0;
+    let mut paused = false;
+
+    let mut fps_timer = 0.0;
+    let mut frames = 0;
+
     loop {
-        println!("---- next frame ----");
-        let delta_time = get_frame_time();
-        frame_time += delta_time;
-        let time = Instant::now();
-        game.update(delta_time);
-        println!("update: {}ms", time.elapsed().as_millis());
-        let time = Instant::now();
-        let mut frames = 0;
-        while frame_time >= FIXED_DELTA_TIME {
-            game.fixed_update(FIXED_DELTA_TIME);
-            frame_time -= FIXED_DELTA_TIME;
-            frames += 1;
+        if is_key_pressed(KeyCode::P) {
+            paused = !paused;
         }
-        println!(
-            "fixed_update: {}ms / {} frames",
-            time.elapsed().as_millis(),
-            frames
-        );
-        let time = Instant::now();
+
+        let delta_time = get_frame_time();
+        fps_timer += delta_time;
+        frames += 1;
+        if fps_timer >= 1.0 {
+            println!("FPS: {:.1}", frames as f32 / fps_timer);
+            fps_timer = 0.0;
+            frames = 0;
+        }
+        game.update(delta_time);
+
+        if !paused || is_key_pressed(KeyCode::Space) {
+            frame_time += delta_time;
+            let mut updates = 0;
+            while !paused && updates < MAX_UPDATES_PER_FRAME && frame_time >= FIXED_DELTA_TIME
+                || paused && updates == 0
+            {
+                game.fixed_update(FIXED_DELTA_TIME);
+                frame_time -= FIXED_DELTA_TIME;
+                updates += 1;
+            }
+        }
+
         game.draw();
-        println!("draw: {}ms", time.elapsed().as_millis());
         next_frame().await;
     }
 }

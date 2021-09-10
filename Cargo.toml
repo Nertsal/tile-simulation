@@ -1,5 +1,5 @@
 [package]
-name = "tile-simulation"
+name = "tile_simulation"
 version = "0.1.0"
 authors = ["Alexander <sasha.kudasov04@gmail.com>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 macroquad = "0.3"
+rayon = "1.5.1"
