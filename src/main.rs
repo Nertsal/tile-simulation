@@ -12,19 +12,26 @@ const MAX_UPDATES_PER_FRAME: usize = 5;
 #[macroquad::main("Tile Physics")]
 async fn main() {
     let mut game = Game::new();
+
     let mut frame_time = 0.0;
     let mut paused = true;
+
+    let mut fps_timer = 0.0;
+    let mut frames = 0;
+
     loop {
         if is_key_pressed(KeyCode::P) {
             paused = !paused;
         }
 
         let delta_time = get_frame_time();
-        println!(
-            "delta_time: {:.1}ms (FPS: {:.1})",
-            delta_time * 1000.0,
-            1.0 / delta_time
-        );
+        fps_timer += delta_time;
+        frames += 1;
+        if fps_timer >= 1.0 {
+            println!("FPS: {:.1}", frames as f32 / fps_timer);
+            fps_timer = 0.0;
+            frames = 0;
+        }
         game.update(delta_time);
 
         if !paused || is_key_pressed(KeyCode::Space) {

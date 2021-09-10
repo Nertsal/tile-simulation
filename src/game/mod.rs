@@ -14,11 +14,13 @@ mod chunk;
 mod renderer;
 mod tick;
 pub mod tile;
+mod tile_move;
+mod tile_move_direction;
 
 use chunk::{tile_index_to_position, Chunk};
 use renderer::Renderer;
 
-use self::tile::Tile;
+use self::{tile::Tile, tile_move::HorizontalMove};
 
 pub struct Game {
     chunks: HashMap<IVec2, Chunk>,
@@ -84,7 +86,9 @@ impl Game {
         } else if is_key_pressed(KeyCode::Key2) {
             self.selected_tile = Some(TileInfo::Sand);
         } else if is_key_pressed(KeyCode::Key3) {
-            self.selected_tile = Some(TileInfo::Water);
+            self.selected_tile = Some(TileInfo::Water {
+                priority: HorizontalMove::Left,
+            });
         }
 
         // Place or delete tile

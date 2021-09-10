@@ -1,8 +1,14 @@
 use macroquad::prelude::{ivec2, IVec2};
 
-use crate::constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y};
+use crate::{
+    constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y},
+    game::tile_move::TileMove,
+};
 
-use super::chunk::tile_index_to_position;
+use super::{
+    chunk::tile_index_to_position, tile_move::HorizontalMove,
+    tile_move_direction::TileMoveDirection,
+};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Tile {
@@ -21,20 +27,35 @@ impl Tile {
 pub enum TileInfo {
     Barrier,
     Sand,
-    Water,
+    Water { priority: HorizontalMove },
 }
 
 impl TileInfo {
-    pub fn movement_directions(&self) -> Vec<IVec2> {
+    pub fn register_move(&mut self, tile_move: TileMoveDirection) {
+        match self {
+            Self::Water { priority } => {
+                if let Some(hor_move) = HorizontalMove::from_tile_move(tile_move) {
+                    *priority = hor_move;
+                }
+            }
+            _ => (),
+        }
+    }
+
+    pub fn movement_directions(&self) -> Vec<TileMoveDirection> {
         match self {
             TileInfo::Barrier => vec![],
-            TileInfo::Sand => vec![ivec2(0, -1), ivec2(-1, -1), ivec2(1, -1)],
-            TileInfo::Water => vec![
-                ivec2(0, -1),
-                ivec2(-1, -1),
-                ivec2(1, -1),
-                ivec2(-1, 0),
-                ivec2(1, 0),
+            TileInfo::Sand => vec![
+                ivec2(0, -1).into(),
+                ivec2(-1, -1).into(),
+                ivec2(1, -1).into(),
+            ],
+            TileInfo::Water { priority } => vec![
+                ivec2(0, -1).into(),
+                ivec2(-1, -1).into(),
+                ivec2(1, -1).into(),
+                priority.to_direction(),
+                priority.opposite().to_direction(),
             ],
         }
     }

@@ -102,6 +102,6 @@ fn tile_color(tile_info: TileInfo) -> Color {
     match tile_info {
         TileInfo::Barrier => WHITE,
         TileInfo::Sand => YELLOW,
-        TileInfo::Water => BLUE,
+        TileInfo::Water { .. } => BLUE,
     }
 }

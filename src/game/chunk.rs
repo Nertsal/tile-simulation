@@ -198,18 +198,17 @@ impl Chunk {
             return MoveInfo::Possible;
         }
 
-        // if this tile's behaviour is unknown,
+        // If this tile's behaviour is unknown,
         // then movement is unknown
         if calculation.unknown[update_index] {
             return MoveInfo::Unknown;
         }
 
-        // If we've alredy checked this tile (implying it can't move)
+        // If we've alredy checked this tile
         // then movement is not allowed
         let checked = calculation.checked[update_index];
         calculation.checked[update_index] = true;
         if checked {
-            self.cant_move[update_index] = true;
             return MoveInfo::Impossible;
         }
 
@@ -220,7 +219,7 @@ impl Chunk {
             .movement_directions()
         {
             // Check if target is inside the current chunk
-            match self.shift_position(update_index, direction) {
+            match self.shift_position(update_index, direction.direction()) {
                 Ok(target_index) => {
                     // Inside the current chunk -> check if movement is possible
                     match self.calculate_tile(
@@ -237,9 +236,10 @@ impl Chunk {
                         MoveInfo::Impossible => {}
                         MoveInfo::Possible => {
                             // Register the move
-                            let tile_info =
+                            let mut tile_info =
                                 std::mem::take(self.tile_info.get_mut(update_index).unwrap())
                                     .unwrap();
+                            tile_info.register_move(direction);
                             calculation.moves[update_index] = Some(target_index);
                             calculation.moves_from[update_index] = true;
                             calculation.moves_to[target_index] = Some(tile_info.clone());
@@ -281,9 +281,10 @@ impl Chunk {
                             MoveInfo::Impossible => {}
                             MoveInfo::Possible => {
                                 // Register the move
-                                let tile_info =
+                                let mut tile_info =
                                     std::mem::take(self.tile_info.get_mut(update_index).unwrap())
                                         .unwrap();
+                                tile_info.register_move(direction);
                                 cross_moves.insert(tile, tile_info);
                                 calculation.moves_from[update_index] = true;
 
@@ -349,11 +350,9 @@ impl Chunk {
                 match self.shift_position(index, shift) {
                     Ok(index) => {
                         // Tile is inside the chunk
-                        if self.tiles[index]
-                            && !self.need_update[index]
-                            && !calculation.checked[index]
-                        {
+                        if self.tiles[index] && !self.need_update[index] {
                             calculation.update_tiles.push(index);
+                            calculation.checked[index] = false;
                             self.cant_move[index] = false;
                         }
                     }
