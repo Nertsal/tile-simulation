@@ -25,12 +25,12 @@ async fn main() {
             delta_time * 1000.0,
             1.0 / delta_time
         );
-        frame_time += delta_time;
         game.update(delta_time);
 
         if !paused || is_key_pressed(KeyCode::Space) {
+            frame_time += delta_time;
             let mut updates = 0;
-            while frame_time >= FIXED_DELTA_TIME && updates < MAX_UPDATES_PER_FRAME
+            while !paused && updates < MAX_UPDATES_PER_FRAME && frame_time >= FIXED_DELTA_TIME
                 || paused && updates == 0
             {
                 game.fixed_update(FIXED_DELTA_TIME);

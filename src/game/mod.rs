@@ -1,4 +1,6 @@
-use macroquad::prelude::{is_mouse_button_down, ivec2, uvec2, IVec2, MouseButton};
+use macroquad::prelude::{
+    is_key_pressed, is_mouse_button_down, ivec2, uvec2, IVec2, KeyCode, MouseButton,
+};
 use std::collections::HashMap;
 
 use crate::{
@@ -22,6 +24,7 @@ pub struct Game {
     chunks: HashMap<IVec2, Chunk>,
     renderer: Renderer,
     view_update: UpdateView,
+    selected_tile: Option<TileInfo>,
 }
 
 impl Game {
@@ -40,6 +43,7 @@ impl Game {
             },
             renderer: Renderer::new(),
             view_update: UpdateView::default(),
+            selected_tile: None,
         };
 
         game.view_update.update_view(
@@ -74,16 +78,25 @@ impl Game {
     }
 
     fn handle_input(&mut self) {
+        // Select tile
+        if is_key_pressed(KeyCode::Key1) {
+            self.selected_tile = Some(TileInfo::Barrier);
+        } else if is_key_pressed(KeyCode::Key2) {
+            self.selected_tile = Some(TileInfo::Sand);
+        } else if is_key_pressed(KeyCode::Key3) {
+            self.selected_tile = Some(TileInfo::Water);
+        }
+
+        // Place or delete tile
         let selected_tile = if is_mouse_button_down(MouseButton::Left) {
-            Some(Some(TileInfo::Sand))
-        } else if is_mouse_button_down(MouseButton::Middle) {
-            Some(Some(TileInfo::Barrier))
+            Some(self.selected_tile.clone())
         } else if is_mouse_button_down(MouseButton::Right) {
             Some(None)
         } else {
             None
         };
 
+        // Do thing
         if let Some(selected_tile) = selected_tile {
             self.set_tile(self.mouse_over_tile(), selected_tile);
         }

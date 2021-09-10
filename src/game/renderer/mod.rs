@@ -2,7 +2,7 @@ use macroquad::{
     camera::{set_camera, Camera2D},
     prelude::{
         draw_rectangle_lines, draw_texture, ivec2, mouse_position, screen_height, screen_width,
-        vec2, Color, FilterMode, IVec2, Image, Texture2D, Vec2, BLACK, WHITE, YELLOW,
+        vec2, Color, FilterMode, IVec2, Image, Texture2D, Vec2, BLACK, BLUE, WHITE, YELLOW,
     },
 };
 
@@ -102,5 +102,6 @@ fn tile_color(tile_info: TileInfo) -> Color {
     match tile_info {
         TileInfo::Barrier => WHITE,
         TileInfo::Sand => YELLOW,
+        TileInfo::Water => BLUE,
     }
 }

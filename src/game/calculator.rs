@@ -104,6 +104,7 @@ impl Calculator {
         &mut self,
         update_chunks: impl ParallelIterator<Item = ChunkInformation<'a, 'b>>,
     ) {
+        // println!("Cycle");
         // Update chunks in parallel
         let calculator = Mutex::new(self);
         update_chunks.for_each(
@@ -124,8 +125,10 @@ impl Calculator {
                     extra_updates,
                     cross_moves,
                     &mut dependencies,
+                    &calculation.dependencies,
                 );
 
+                // println!("Registered {}", chunk.chunk_pos);
                 calculator
                     .calculations
                     .insert(chunk.chunk_pos, (calculation, dependencies));
@@ -139,7 +142,8 @@ impl Calculator {
         chunk_updates: DataArray<Option<MoveInfo>>,
         extra_updates: Vec<Tile>,
         cross_moves: HashMap<Tile, TileInfo>,
-        dependencies: &mut HashMap<Tile, MoveInfo>,
+        dependencies: &mut Dependencies,
+        tile_dependencies: &DataArray<Option<Tile>>,
     ) {
         // Queue updates for other chunks
         for update_tile in
@@ -184,10 +188,34 @@ impl Calculator {
 
         // Update dependencies
         let mut need_update = false;
-        for (tile, move_info) in dependencies {
-            if let MoveInfo::Unknown = *move_info {
-                *move_info = match self.chunk_calculations.get(&tile.chunk_pos) {
-                    Some(calculation) => calculation[tile.index],
+        for (tile, depend_tile) in
+            tile_dependencies
+                .iter()
+                .enumerate()
+                .filter_map(|(tile, depend_tile)| {
+                    depend_tile.as_ref().map(|depend_tile| (tile, depend_tile))
+                })
+        {
+            // Only update those that are still unknown
+            let move_info = dependencies.get_mut(depend_tile).unwrap();
+            if let MoveInfo::Unknown = move_info {
+                // Look for evaluated chunks
+                *move_info = match self.chunk_calculations.get(&depend_tile.chunk_pos) {
+                    Some(calculation) => {
+                        // If dependent tile depends on current tile, then movement is not allowed
+                        match self.calculations.get(&depend_tile.chunk_pos) {
+                            Some((calculation, _))
+                                if calculation.dependencies[depend_tile.index]
+                                    == Some(Tile {
+                                        chunk_pos,
+                                        index: tile,
+                                    }) =>
+                            {
+                                MoveInfo::Impossible
+                            }
+                            _ => calculation[depend_tile.index],
+                        }
+                    }
                     None => MoveInfo::Impossible,
                 };
                 need_update = true;

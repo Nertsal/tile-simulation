@@ -21,6 +21,7 @@ impl Tile {
 pub enum TileInfo {
     Barrier,
     Sand,
+    Water,
 }
 
 impl TileInfo {
@@ -28,6 +29,13 @@ impl TileInfo {
         match self {
             TileInfo::Barrier => vec![],
             TileInfo::Sand => vec![ivec2(0, -1), ivec2(-1, -1), ivec2(1, -1)],
+            TileInfo::Water => vec![
+                ivec2(0, -1),
+                ivec2(-1, -1),
+                ivec2(1, -1),
+                ivec2(-1, 0),
+                ivec2(1, 0),
+            ],
         }
     }
 }

@@ -98,6 +98,7 @@ impl Chunk {
                 update_tiles
             },
             unknown: data_array(false),
+            dependencies: default_data_array(),
             view_update: default_data_array(),
         };
 
@@ -153,6 +154,7 @@ impl Chunk {
         {
             calculation.update_tiles.push(unknown_tile);
             calculation.checked[unknown_tile] = false;
+            self.cant_move[unknown_tile] = false;
         }
 
         // Calculate tiles
@@ -241,6 +243,7 @@ impl Chunk {
                             calculation.moves[update_index] = Some(target_index);
                             calculation.moves_from[update_index] = true;
                             calculation.moves_to[target_index] = Some(tile_info.clone());
+                            self.cant_move[update_index] = false;
 
                             // Update view
                             calculation.view_update[target_index] = Some(Some(tile_info));
@@ -258,29 +261,46 @@ impl Chunk {
                     }
                 }
                 Err(tile) => {
-                    // Outside of the current chunk -> check if it's been calculated, else queue calculation
-                    match dependencies.entry(tile).or_insert(MoveInfo::Unknown) {
-                        MoveInfo::Unknown => {
-                            calculation.unknown[update_index] = true;
-                            return MoveInfo::Unknown;
-                        }
-                        MoveInfo::Impossible => {}
-                        MoveInfo::Possible => {
-                            // Register the move
-                            let tile_info =
-                                std::mem::take(self.tile_info.get_mut(update_index).unwrap())
-                                    .unwrap();
-                            cross_moves.insert(tile, tile_info);
-                            calculation.moves_from[update_index] = true;
+                    // Outside of the current chunk
+                    // If other tile depends on it, then movement is not allowed
+                    let entry = dependencies.entry(tile);
+                    let available = if let std::collections::hash_map::Entry::Vacant(_) = &entry {
+                        true
+                    } else {
+                        false
+                    } || calculation.dependencies[update_index] == Some(tile);
 
-                            // Update view
-                            if calculation.moves_to[update_index].is_none() {
-                                calculation.view_update[update_index] = Some(None);
+                    if available {
+                        calculation.dependencies[update_index] = Some(tile);
+                        // Check if it's been calculated, else queue calculation
+                        match entry.or_insert(MoveInfo::Unknown) {
+                            MoveInfo::Unknown => {
+                                calculation.unknown[update_index] = true;
+                                return MoveInfo::Unknown;
                             }
+                            MoveInfo::Impossible => {}
+                            MoveInfo::Possible => {
+                                // Register the move
+                                let tile_info =
+                                    std::mem::take(self.tile_info.get_mut(update_index).unwrap())
+                                        .unwrap();
+                                cross_moves.insert(tile, tile_info);
+                                calculation.moves_from[update_index] = true;
 
-                            // Update nearby lazy tiles
-                            self.update_tiles_around(update_index, 1, calculation, extra_updates);
-                            return MoveInfo::Possible;
+                                // Update view
+                                if calculation.moves_to[update_index].is_none() {
+                                    calculation.view_update[update_index] = Some(None);
+                                }
+
+                                // Update nearby lazy tiles
+                                self.update_tiles_around(
+                                    update_index,
+                                    1,
+                                    calculation,
+                                    extra_updates,
+                                );
+                                return MoveInfo::Possible;
+                            }
                         }
                     }
                 }
@@ -411,5 +431,6 @@ pub struct ChunkCalculation {
     pub moves_to: DataArray<Option<TileInfo>>,
     update_tiles: Vec<usize>,
     unknown: DataArray<bool>,
+    pub dependencies: DataArray<Option<Tile>>,
     pub view_update: DataArray<Option<Option<TileInfo>>>,
 }
