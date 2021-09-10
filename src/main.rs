@@ -14,7 +14,7 @@ async fn main() {
     let mut game = Game::new();
 
     let mut frame_time = 0.0;
-    let mut paused = true;
+    let mut paused = false;
 
     let mut fps_timer = 0.0;
     let mut frames = 0;

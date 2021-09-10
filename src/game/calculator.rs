@@ -104,7 +104,6 @@ impl Calculator {
         &mut self,
         update_chunks: impl ParallelIterator<Item = ChunkInformation<'a, 'b>>,
     ) {
-        // println!("Cycle");
         // Update chunks in parallel
         let calculator = Mutex::new(self);
         update_chunks.for_each(
@@ -128,7 +127,6 @@ impl Calculator {
                     &calculation.dependencies,
                 );
 
-                // println!("Registered {}", chunk.chunk_pos);
                 calculator
                     .calculations
                     .insert(chunk.chunk_pos, (calculation, dependencies));
@@ -211,7 +209,7 @@ impl Calculator {
                                         index: tile,
                                     }) =>
                             {
-                                MoveInfo::Impossible
+                                MoveInfo::Recursive
                             }
                             _ => calculation[depend_tile.index],
                         }

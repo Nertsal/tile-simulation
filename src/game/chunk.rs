@@ -120,6 +120,7 @@ impl Chunk {
                 .filter_map(|(index, update)| if update { Some(index) } else { None })
             {
                 calculation.update_tiles.push(update_index);
+                calculation.checked[update_index] = false;
                 self.cant_move[update_index] = false;
             }
         }
@@ -209,6 +210,7 @@ impl Chunk {
         let checked = calculation.checked[update_index];
         calculation.checked[update_index] = true;
         if checked {
+            self.cant_move[update_index] = true;
             return MoveInfo::Impossible;
         }
 
@@ -234,7 +236,11 @@ impl Chunk {
                             return MoveInfo::Unknown;
                         }
                         MoveInfo::Impossible => {}
+                        MoveInfo::Recursive => unreachable!(),
                         MoveInfo::Possible => {
+                            // Remove dependency
+                            calculation.dependencies[update_index] = None;
+
                             // Register the move
                             let mut tile_info =
                                 std::mem::take(self.tile_info.get_mut(update_index).unwrap())
@@ -262,23 +268,35 @@ impl Chunk {
                 }
                 Err(tile) => {
                     // Outside of the current chunk
-                    // If other tile depends on it, then movement is not allowed
                     let entry = dependencies.entry(tile);
-                    let available = if let std::collections::hash_map::Entry::Vacant(_) = &entry {
+                    let is_current_dependency =
+                        calculation.dependencies[update_index] == Some(tile);
+                    // If other tile depends on it, then movement is not allowed
+                    let vacant = if let std::collections::hash_map::Entry::Vacant(_) = &entry {
                         true
                     } else {
                         false
-                    } || calculation.dependencies[update_index] == Some(tile);
+                    };
 
-                    if available {
-                        calculation.dependencies[update_index] = Some(tile);
+                    if is_current_dependency || vacant {
+                        if !is_current_dependency {
+                            calculation.dependencies[update_index] = Some(tile);
+                        }
+
                         // Check if it's been calculated, else queue calculation
-                        match entry.or_insert(MoveInfo::Unknown) {
+                        let dependency = entry.or_insert(MoveInfo::Unknown);
+                        match dependency {
                             MoveInfo::Unknown => {
                                 calculation.unknown[update_index] = true;
                                 return MoveInfo::Unknown;
                             }
                             MoveInfo::Impossible => {}
+                            MoveInfo::Recursive => {
+                                // Reset dependency
+                                if is_current_dependency {
+                                    *dependency = MoveInfo::Unknown;
+                                }
+                            }
                             MoveInfo::Possible => {
                                 // Register the move
                                 let mut tile_info =
@@ -420,6 +438,7 @@ impl Chunk {
 pub enum MoveInfo {
     Unknown,
     Impossible,
+    Recursive,
     Possible,
 }
 
