@@ -28,6 +28,7 @@ pub struct Game {
     renderer: Renderer,
     view_update: UpdateView,
     selected_tile: Option<TileType>,
+    last_mouse_pos: Vec2,
 }
 
 impl Game {
@@ -47,6 +48,7 @@ impl Game {
             renderer: Renderer::new(),
             view_update: UpdateView::default(),
             selected_tile: None,
+            last_mouse_pos: Vec2::ZERO,
         };
 
         game.view_update.update_view(
@@ -68,7 +70,7 @@ impl Game {
     }
 
     pub fn update(&mut self, delta_time: f32) {
-        self.handle_input();
+        self.handle_input(delta_time);
         self.renderer.update(delta_time);
     }
 
@@ -80,7 +82,7 @@ impl Game {
         self.renderer.draw(std::mem::take(&mut self.view_update));
     }
 
-    fn handle_input(&mut self) {
+    fn handle_input(&mut self, delta_time: f32) {
         // Select tile
         if is_key_pressed(KeyCode::Key1) {
             self.selected_tile = Some(TileType::Barrier);
@@ -100,18 +102,21 @@ impl Game {
         };
 
         // Do thing
+        let mouse_pos = self.renderer.mouse_world_pos();
         if let Some(selected_tile) = selected_tile {
             self.set_tile(
                 self.mouse_over_tile(),
                 selected_tile.map(|tile_type| TileInfo {
                     gravity_scale: vec2(0.0, -1.0),
-                    velocity: Vec2::ZERO.into(),
+                    velocity: ((mouse_pos - self.last_mouse_pos) / delta_time / 50.0).into(),
                     process_velocity: Vec2::ZERO.into(),
                     tick_velocity: IVec2::ZERO.into(),
                     tile_type,
                 }),
             );
         }
+
+        self.last_mouse_pos = mouse_pos;
     }
 
     fn set_tile(&mut self, tile: Tile, tile_info: Option<TileInfo>) {

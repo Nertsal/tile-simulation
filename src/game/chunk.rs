@@ -89,6 +89,7 @@ impl Chunk {
                 if need_update[index] {
                     tile.prepare_tick();
                 } else {
+                    // Set velocity = gravity for extra updates
                     tile.lazy();
                 }
             });
