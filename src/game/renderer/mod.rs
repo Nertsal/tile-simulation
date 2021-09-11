@@ -11,7 +11,7 @@ use crate::{
     update_view::UpdateView,
 };
 
-use super::tile::TileInfo;
+use super::tile::TileType;
 
 pub struct Renderer {
     game_camera: Camera2D,
@@ -65,7 +65,7 @@ impl Renderer {
                 match tile {
                     None => self.image.set_pixel(pos.x as u32, pos.y as u32, BLACK),
                     Some(tile_info) => {
-                        let color = tile_color(tile_info);
+                        let color = tile_color(tile_info.tile_type);
                         self.image.set_pixel(pos.x as u32, pos.y as u32, color);
                     }
                 }
@@ -98,10 +98,10 @@ impl Renderer {
     }
 }
 
-fn tile_color(tile_info: TileInfo) -> Color {
-    match tile_info {
-        TileInfo::Barrier => WHITE,
-        TileInfo::Sand => YELLOW,
-        TileInfo::Water { .. } => BLUE,
+fn tile_color(tile_type: TileType) -> Color {
+    match tile_type {
+        TileType::Barrier => WHITE,
+        TileType::Sand => YELLOW,
+        TileType::Water { .. } => BLUE,
     }
 }
