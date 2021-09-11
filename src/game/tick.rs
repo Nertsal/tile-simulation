@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{
     calculator::{Calculator, ViewUpdates},
     tile::Tile,
@@ -23,13 +25,31 @@ impl Game {
     }
 
     fn perform_tick(&mut self) -> ViewUpdates {
+        use rayon::prelude::*;
+
+        let chunk_positions: Vec<_> = self.chunks.keys().copied().collect();
+
+        // Collect chunks for update
+        let mut chunks: HashMap<_, _> = self
+            .chunks
+            .iter_mut()
+            .map(|(&pos, chunk)| (pos, chunk))
+            .collect();
+
+        // Prepare for tick (apply gravity)
+        chunks
+            .par_iter_mut()
+            .for_each(|(_, chunk)| chunk.prepare_tick());
+
         // Calculate chunks mostly in parallel
-        let mut calculator = Calculator::new(self.chunks.keys().copied());
-        calculator.tick(
-            self.chunks
-                .iter_mut()
-                .map(|(&pos, chunk)| (pos, chunk))
-                .collect(),
-        )
+        let mut view_update = HashMap::new();
+        loop {
+            let mut calculator = Calculator::new(chunk_positions.iter().copied());
+            let done = calculator.step(&mut chunks, &mut view_update);
+            if done {
+                break;
+            }
+        }
+        view_update
     }
 }

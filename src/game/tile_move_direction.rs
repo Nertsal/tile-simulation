@@ -17,6 +17,7 @@ impl std::fmt::Display for DirectionError {
 
 impl std::error::Error for DirectionError {}
 
+#[derive(Clone, Copy, Debug)]
 pub struct TileMoveDirection {
     direction: IVec2,
 }

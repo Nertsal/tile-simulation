@@ -1,14 +1,8 @@
-use macroquad::prelude::{ivec2, IVec2};
+use macroquad::prelude::{ivec2, IVec2, Vec2};
 
-use crate::{
-    constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y},
-    game::tile_move::TileMove,
-};
+use crate::constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y, TICK_GRAVITY};
 
-use super::{
-    chunk::tile_index_to_position, tile_move::HorizontalMove,
-    tile_move_direction::TileMoveDirection,
-};
+use super::{chunk::tile_index_to_position, tick_velocity::TickVelocity, velocity::Velocity};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Tile {
@@ -24,39 +18,25 @@ impl Tile {
 }
 
 #[derive(Clone, Debug)]
-pub enum TileInfo {
-    Barrier,
-    Sand,
-    Water { priority: HorizontalMove },
+pub struct TileInfo {
+    pub gravity_scale: Vec2,
+    pub velocity: Velocity,
+    pub process_velocity: Velocity,
+    pub tick_velocity: TickVelocity,
+    pub tile_type: TileType,
 }
 
 impl TileInfo {
-    pub fn register_move(&mut self, tile_move: TileMoveDirection) {
-        match self {
-            Self::Water { priority } => {
-                if let Some(hor_move) = HorizontalMove::from_tile_move(tile_move) {
-                    *priority = hor_move;
-                }
-            }
-            _ => (),
-        }
+    pub fn prepare_tick(&mut self) {
+        self.velocity += self.gravity_scale * TICK_GRAVITY;
+        self.process_velocity += self.velocity;
+        self.tick_velocity = self.process_velocity.tick_velocity();
     }
+}
 
-    pub fn movement_directions(&self) -> Vec<TileMoveDirection> {
-        match self {
-            TileInfo::Barrier => vec![],
-            TileInfo::Sand => vec![
-                ivec2(0, -1).into(),
-                ivec2(-1, -1).into(),
-                ivec2(1, -1).into(),
-            ],
-            TileInfo::Water { priority } => vec![
-                ivec2(0, -1).into(),
-                ivec2(-1, -1).into(),
-                ivec2(1, -1).into(),
-                priority.to_direction(),
-                priority.opposite().to_direction(),
-            ],
-        }
-    }
+#[derive(Clone, Debug)]
+pub enum TileType {
+    Barrier,
+    Sand,
+    Water,
 }

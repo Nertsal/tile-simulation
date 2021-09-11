@@ -1,5 +1,5 @@
 use macroquad::prelude::{
-    is_key_pressed, is_mouse_button_down, ivec2, uvec2, IVec2, KeyCode, MouseButton,
+    is_key_pressed, is_mouse_button_down, ivec2, uvec2, vec2, IVec2, KeyCode, MouseButton, Vec2,
 };
 use std::collections::HashMap;
 
@@ -13,20 +13,21 @@ mod calculator;
 mod chunk;
 mod renderer;
 mod tick;
+mod tick_velocity;
 pub mod tile;
-mod tile_move;
 mod tile_move_direction;
+mod velocity;
 
 use chunk::{tile_index_to_position, Chunk};
 use renderer::Renderer;
 
-use self::{tile::Tile, tile_move::HorizontalMove};
+use self::tile::{Tile, TileType};
 
 pub struct Game {
     chunks: HashMap<IVec2, Chunk>,
     renderer: Renderer,
     view_update: UpdateView,
-    selected_tile: Option<TileInfo>,
+    selected_tile: Option<TileType>,
 }
 
 impl Game {
@@ -82,13 +83,11 @@ impl Game {
     fn handle_input(&mut self) {
         // Select tile
         if is_key_pressed(KeyCode::Key1) {
-            self.selected_tile = Some(TileInfo::Barrier);
+            self.selected_tile = Some(TileType::Barrier);
         } else if is_key_pressed(KeyCode::Key2) {
-            self.selected_tile = Some(TileInfo::Sand);
+            self.selected_tile = Some(TileType::Sand);
         } else if is_key_pressed(KeyCode::Key3) {
-            self.selected_tile = Some(TileInfo::Water {
-                priority: HorizontalMove::Left,
-            });
+            self.selected_tile = Some(TileType::Water);
         }
 
         // Place or delete tile
@@ -102,7 +101,16 @@ impl Game {
 
         // Do thing
         if let Some(selected_tile) = selected_tile {
-            self.set_tile(self.mouse_over_tile(), selected_tile);
+            self.set_tile(
+                self.mouse_over_tile(),
+                selected_tile.map(|tile_type| TileInfo {
+                    gravity_scale: vec2(0.0, -1.0),
+                    velocity: Vec2::ZERO.into(),
+                    process_velocity: Vec2::ZERO.into(),
+                    tick_velocity: IVec2::ZERO.into(),
+                    tile_type,
+                }),
+            );
         }
     }
 

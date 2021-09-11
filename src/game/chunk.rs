@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use macroquad::prelude::{ivec2, uvec2, IVec2, UVec2};
+use macroquad::prelude::{ivec2, uvec2, IVec2, UVec2, Vec2};
 
 use crate::constants::{CHUNK_SIZE, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 
@@ -76,6 +76,24 @@ impl Chunk {
     pub fn queue_update(&mut self, index: usize) {
         self.need_update[index] = true;
         self.cant_move[index] = false;
+    }
+
+    pub fn prepare_tick(&mut self) {
+        // Apply gravity and calculate tick velocity
+        let need_update = &self.need_update;
+        self.tile_info
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(index, tile)| {
+                if need_update[index] {
+                    tile.as_mut()
+                } else {
+                    None
+                }
+            })
+            .for_each(|tile| {
+                tile.prepare_tick();
+            });
     }
 
     pub fn prepare_calculation(&mut self) -> (ChunkCalculation, Dependencies) {
@@ -210,15 +228,15 @@ impl Chunk {
         let checked = calculation.checked[update_index];
         calculation.checked[update_index] = true;
         if checked {
-            self.cant_move[update_index] = true;
             return MoveInfo::Impossible;
         }
 
         // Check for possible moves
         for direction in self.tile_info[update_index]
-            .as_ref()
+            .as_mut()
             .unwrap()
-            .movement_directions()
+            .tick_velocity
+            .directions()
         {
             // Check if target is inside the current chunk
             match self.shift_position(update_index, direction.direction()) {
@@ -245,7 +263,7 @@ impl Chunk {
                             let mut tile_info =
                                 std::mem::take(self.tile_info.get_mut(update_index).unwrap())
                                     .unwrap();
-                            tile_info.register_move(direction);
+                            tile_info.tick_velocity -= direction;
                             calculation.moves[update_index] = Some(target_index);
                             calculation.moves_from[update_index] = true;
                             calculation.moves_to[target_index] = Some(tile_info.clone());
@@ -302,7 +320,7 @@ impl Chunk {
                                 let mut tile_info =
                                     std::mem::take(self.tile_info.get_mut(update_index).unwrap())
                                         .unwrap();
-                                tile_info.register_move(direction);
+                                tile_info.tick_velocity -= direction;
                                 cross_moves.insert(tile, tile_info);
                                 calculation.moves_from[update_index] = true;
 
@@ -326,10 +344,17 @@ impl Chunk {
             }
         }
 
-        // There are no possible moves
-        // Set this tile into lazy mode
-        self.cant_move[update_index] = true;
-        self.need_update[update_index] = false;
+        // There are no possible moves or velocity is zero
+        // Set this tile into lazy mode if velocity is not zero
+        let tile = self.tile_info[update_index].as_mut().unwrap();
+        let need_update = tile.tick_velocity.is_zero();
+        self.cant_move[update_index] = !need_update;
+        self.need_update[update_index] = need_update;
+        if !need_update {
+            tile.velocity = Vec2::ZERO.into();
+            tile.process_velocity = Vec2::ZERO.into();
+            tile.tick_velocity = IVec2::ZERO.into();
+        }
         MoveInfo::Impossible
     }
 
@@ -419,7 +444,8 @@ impl Chunk {
         }
     }
 
-    pub fn movement(&mut self, moves: DataArray<Option<TileInfo>>) {
+    pub fn movement(&mut self, moves: DataArray<Option<TileInfo>>) -> bool {
+        // Perform moves
         for (index, tile_info) in moves
             .into_iter()
             .enumerate()
@@ -428,9 +454,19 @@ impl Chunk {
             self.tile_info[index] = Some(tile_info);
         }
 
+        // Sync tiles and tile_info
+        // done means whether all tiles have moved the distance they had to
+        let mut done = true;
         for (index, tile) in self.tile_info.iter().enumerate() {
             self.tiles[index] = tile.is_some();
+            if let Some(tile) = tile {
+                if !tile.tick_velocity.is_zero() {
+                    done = false;
+                }
+            }
         }
+
+        done
     }
 }
 

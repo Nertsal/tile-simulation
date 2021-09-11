@@ -53,7 +53,13 @@ impl Calculator {
         }
     }
 
-    pub fn tick(&mut self, mut chunks: HashMap<IVec2, &mut Chunk>) -> ViewUpdates {
+    pub fn step(
+        &mut self,
+        chunks: &mut HashMap<IVec2, &mut Chunk>,
+        view_update: &mut ViewUpdates,
+    ) -> bool {
+        let chunks_count = self.chunk_calculations.len();
+
         // Prepare chunks for calculation
         self.prepare_chunks(chunks.values_mut().collect());
 
@@ -79,14 +85,26 @@ impl Calculator {
         }
 
         // Perform movement and collect view updates
-        let mut view_update = HashMap::with_capacity(self.calculations.len());
-        for (chunk_pos, chunk) in &mut chunks {
+        let mut chunks_done = 0;
+        for (chunk_pos, chunk) in chunks {
             let (calculation, _) = self.calculations.remove(chunk_pos).unwrap();
-            chunk.movement(calculation.moves_to);
-            view_update.insert(*chunk_pos, calculation.view_update);
+            if chunk.movement(calculation.moves_to) {
+                chunks_done += 1;
+            }
+            let view_update = view_update
+                .entry(*chunk_pos)
+                .or_insert_with(|| default_data_array());
+            for (index, update) in calculation
+                .view_update
+                .into_iter()
+                .enumerate()
+                .filter_map(|(index, update)| update.map(|update| (index, update)))
+            {
+                view_update[index] = Some(update);
+            }
         }
 
-        view_update
+        chunks_done == chunks_count
     }
 
     fn prepare_chunks<'a>(&mut self, update_queue: Vec<&mut &'a mut Chunk>) {
