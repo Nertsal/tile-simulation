@@ -349,16 +349,17 @@ impl Chunk {
         }
 
         // There are no possible moves or velocity is zero
-        // Set this tile into lazy mode if velocity is not zero
         let tile = self.tile_info[update_index].as_mut().unwrap();
-        let need_update = tile.tick_velocity.is_zero() && !tile.velocity.is_zero();
+        println!("{:?}", tile.velocity);
+        let need_update = tile.tick_velocity.is_zero() || !tile.velocity.is_zero();
+        tile.tick_velocity = IVec2::ZERO.into();
+
+        // Set this tile into lazy mode if velocity is not zero
         self.cant_move[update_index] = !need_update;
         self.need_update[update_index] = need_update;
         if !need_update {
             tile.velocity = Vec2::ZERO.into();
         }
-        tile.process_velocity = Vec2::ZERO.into();
-        tile.tick_velocity = IVec2::ZERO.into();
         MoveInfo::Impossible
     }
 
