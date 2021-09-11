@@ -108,7 +108,9 @@ impl Game {
                 self.mouse_over_tile(),
                 selected_tile.map(|tile_type| TileInfo {
                     gravity_scale: vec2(0.0, -1.0),
-                    velocity: ((mouse_pos - self.last_mouse_pos) / delta_time / 50.0).into(),
+                    velocity: ((mouse_pos - self.last_mouse_pos) / delta_time / 50.0
+                        + vec2(0.0, -1.0))
+                    .into(),
                     process_velocity: Vec2::ZERO.into(),
                     tick_velocity: IVec2::ZERO.into(),
                     tile_type,

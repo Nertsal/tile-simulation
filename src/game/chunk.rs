@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use macroquad::prelude::{ivec2, uvec2, IVec2, UVec2, Vec2};
+use macroquad::prelude::{ivec2, uvec2, IVec2, UVec2};
 
 use crate::constants::{CHUNK_SIZE, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 
@@ -350,15 +350,14 @@ impl Chunk {
 
         // There are no possible moves or velocity is zero
         let tile = self.tile_info[update_index].as_mut().unwrap();
-        println!("{:?}", tile.velocity);
+        // Lazy if tile attempted to move but failed
         let need_update = tile.tick_velocity.is_zero() || !tile.velocity.is_zero();
         tile.tick_velocity = IVec2::ZERO.into();
 
-        // Set this tile into lazy mode if velocity is not zero
         self.cant_move[update_index] = !need_update;
         self.need_update[update_index] = need_update;
         if !need_update {
-            tile.velocity = Vec2::ZERO.into();
+            tile.lazy();
         }
         MoveInfo::Impossible
     }
