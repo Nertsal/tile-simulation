@@ -1,4 +1,4 @@
-use macroquad::prelude::IVec2;
+use macroquad::prelude::{vec2, IVec2, Vec2};
 
 #[derive(Debug)]
 pub enum DirectionError {
@@ -39,6 +39,11 @@ impl TileMoveDirection {
 
     pub fn direction(&self) -> IVec2 {
         self.direction
+    }
+
+    pub fn direction_f32(&self) -> Vec2 {
+        let direction = self.direction();
+        vec2(direction.x as f32, direction.y as f32)
     }
 }
 

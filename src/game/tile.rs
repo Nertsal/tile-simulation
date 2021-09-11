@@ -32,6 +32,10 @@ impl TileInfo {
         self.process_velocity += self.velocity;
         self.tick_velocity = self.process_velocity.tick_velocity();
     }
+
+    pub fn lazy(&mut self) {
+        self.velocity = (self.gravity_scale * TICK_GRAVITY).into();
+    }
 }
 
 #[derive(Clone, Debug)]

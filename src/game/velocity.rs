@@ -10,6 +10,10 @@ pub struct Velocity {
 }
 
 impl Velocity {
+    pub fn is_zero(&self) -> bool {
+        self.velocity.x == 0.0 && self.velocity.y == 0.0
+    }
+
     pub fn tick_velocity(&mut self) -> TickVelocity {
         let x = self.velocity.x.abs().floor() * self.velocity.x.signum();
         let y = self.velocity.y.abs().floor() * self.velocity.y.signum();
@@ -38,8 +42,13 @@ impl AddAssign for Velocity {
 
 impl SubAssign<TileMoveDirection> for Velocity {
     fn sub_assign(&mut self, rhs: TileMoveDirection) {
-        let rhs = rhs.direction();
-        self.velocity -= vec2(rhs.x as f32, rhs.y as f32);
+        self.velocity -= rhs.direction_f32();
+    }
+}
+
+impl SubAssign<Vec2> for Velocity {
+    fn sub_assign(&mut self, rhs: Vec2) {
+        self.velocity -= rhs;
     }
 }
 
