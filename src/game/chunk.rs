@@ -104,6 +104,8 @@ impl Chunk {
             moves: data_array(None),
             cross_moves: default_data_array(),
             moves_to: default_data_array(),
+            collisions: vec![],
+            cross_collisions: vec![],
             update_tiles: {
                 let mut update_tiles = Vec::new();
                 for index in 0..self.need_update.len() {
@@ -138,9 +140,7 @@ impl Chunk {
                 .enumerate()
                 .filter_map(|(index, update)| if update { Some(index) } else { None })
             {
-                calculation.update_tiles.push(update_index);
-                calculation.checked[update_index] = false;
-                self.cant_move[update_index] = false;
+                self.update_tile(update_index, calculation);
             }
         }
 
@@ -180,6 +180,7 @@ impl Chunk {
         let mut chunk_updates = data_array(None);
         let mut extra_updates = Vec::new();
         let mut cross_moves = HashSet::new();
+        let mut collisions = Vec::new();
         while !calculation.update_tiles.is_empty() {
             let update_index = calculation.update_tiles.remove(0);
             let move_info = self.calculate_tile(
@@ -188,6 +189,7 @@ impl Chunk {
                 &mut extra_updates,
                 &mut cross_moves,
                 dependencies,
+                &mut collisions,
             );
             chunk_updates[update_index] = Some(move_info);
         }
@@ -202,6 +204,7 @@ impl Chunk {
         extra_updates: &mut Vec<Tile>,
         cross_moves: &mut HashSet<Tile>,
         dependencies: &mut Dependencies,
+        collisions: &mut Vec<(TileInfo, Tile)>,
     ) -> MoveInfo {
         // If this tile couldn't move last frame
         // or another tile is going to move here,
@@ -244,16 +247,41 @@ impl Chunk {
                         extra_updates,
                         cross_moves,
                         dependencies,
+                        collisions,
                     ) {
                         MoveInfo::Unknown => {
                             calculation.unknown[update_index] = true;
                             return MoveInfo::Unknown;
                         }
                         MoveInfo::Impossible => {
-                            // Reduce velocity in that direction
-                            let tile = self.tile_info[update_index].as_mut().unwrap();
-                            let direction = direction.direction_f32().normalize();
-                            tile.velocity -= direction * tile.velocity.velocity.dot(direction);
+                            calculation.collisions.push((update_index, target_index));
+                            // // Collide with tile
+                            // // let direction = direction.direction_f32().normalize();
+
+                            // let tile = self.tile_info[update_index].as_ref().unwrap();
+                            // let other = self.tile_info[target_index].as_ref().unwrap();
+
+                            // let (
+                            //     tile_velocity,
+                            //     tile_process_velocity,
+                            //     tile_tick_velocity,
+                            //     other_velocity,
+                            //     other_process_velocity,
+                            //     other_tick_velocity,
+                            // ) = tile.collide(other);
+
+                            // let tile = self.tile_info[update_index].as_mut().unwrap();
+                            // tile.velocity = tile_velocity;
+                            // tile.process_velocity = tile_process_velocity;
+                            // tile.tick_velocity = tile_tick_velocity;
+
+                            // let other = self.tile_info[target_index].as_mut().unwrap();
+                            // other.velocity = other_velocity;
+                            // other.process_velocity = other_process_velocity;
+                            // other.tick_velocity = other_tick_velocity;
+
+                            // self.update_tile(update_index, calculation);
+                            // self.update_tile(target_index, calculation);
                         }
                         MoveInfo::Recursive => unreachable!(),
                         MoveInfo::Possible => {
@@ -301,9 +329,7 @@ impl Chunk {
                                 return MoveInfo::Unknown;
                             }
                             MoveInfo::Impossible => {
-                                let tile = self.tile_info[update_index].as_mut().unwrap();
-                                let direction = direction.direction_f32().normalize();
-                                tile.velocity -= direction * tile.velocity.velocity.dot(direction);
+                                calculation.cross_collisions.push((update_index, tile));
                             }
                             MoveInfo::Recursive => {
                                 // Reset dependency
@@ -337,7 +363,7 @@ impl Chunk {
         // There are no possible moves or velocity is zero
         let tile = self.tile_info[update_index].as_mut().unwrap();
         // Lazy if tile attempted to move but failed
-        let need_update = tile.tick_velocity.is_zero() || !tile.velocity.is_zero();
+        let need_update = tile.tick_velocity.is_zero() || !tile.velocity.is_close_zero();
         tile.tick_velocity = IVec2::ZERO.into();
 
         self.cant_move[update_index] = !need_update;
@@ -384,9 +410,7 @@ impl Chunk {
                     Ok(index) => {
                         // Tile is inside the chunk
                         if self.tiles[index] && !self.need_update[index] {
-                            calculation.update_tiles.push(index);
-                            calculation.checked[index] = false;
-                            self.cant_move[index] = false;
+                            self.update_tile(index, calculation);
                         }
                     }
                     Err(tile) => {
@@ -396,6 +420,12 @@ impl Chunk {
                 }
             }
         }
+    }
+
+    fn update_tile(&mut self, index: usize, calculation: &mut ChunkCalculation) {
+        calculation.update_tiles.push(index);
+        calculation.checked[index] = false;
+        self.cant_move[index] = false;
     }
 
     pub fn shift_position(
@@ -529,6 +559,8 @@ pub struct ChunkCalculation {
     moves: DataArray<Option<usize>>,
     pub cross_moves: DataArray<Option<Tile>>,
     pub moves_to: DataArray<bool>,
+    pub collisions: Vec<(usize, usize)>,
+    pub cross_collisions: Vec<(usize, Tile)>,
     update_tiles: Vec<usize>,
     unknown: DataArray<bool>,
     pub dependencies: DataArray<Option<Tile>>,

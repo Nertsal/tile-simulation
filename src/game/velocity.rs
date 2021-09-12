@@ -1,4 +1,4 @@
-use std::ops::{AddAssign, Mul, SubAssign};
+use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 
 use macroquad::prelude::{ivec2, vec2, Vec2};
 
@@ -10,8 +10,8 @@ pub struct Velocity {
 }
 
 impl Velocity {
-    pub fn is_zero(&self) -> bool {
-        self.velocity.x == 0.0 && self.velocity.y == 0.0
+    pub fn is_close_zero(&self) -> bool {
+        self.velocity.x.abs() <= 0.1 && self.velocity.y.abs() <= 0.1
     }
 
     pub fn tick_velocity(&mut self) -> TickVelocity {
@@ -28,9 +28,19 @@ impl From<Vec2> for Velocity {
     }
 }
 
-impl AddAssign<Vec2> for Velocity {
-    fn add_assign(&mut self, rhs: Vec2) {
-        self.velocity += rhs;
+impl Add for Velocity {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.velocity + rhs.velocity).into()
+    }
+}
+
+impl Sub for Velocity {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        (self.velocity - rhs.velocity).into()
     }
 }
 
@@ -40,9 +50,15 @@ impl AddAssign for Velocity {
     }
 }
 
-impl SubAssign<TileMoveDirection> for Velocity {
-    fn sub_assign(&mut self, rhs: TileMoveDirection) {
-        self.velocity -= rhs.direction_f32();
+impl AddAssign<Vec2> for Velocity {
+    fn add_assign(&mut self, rhs: Vec2) {
+        self.velocity += rhs;
+    }
+}
+
+impl SubAssign for Velocity {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.velocity -= rhs.velocity;
     }
 }
 
@@ -52,10 +68,24 @@ impl SubAssign<Vec2> for Velocity {
     }
 }
 
+impl SubAssign<TileMoveDirection> for Velocity {
+    fn sub_assign(&mut self, rhs: TileMoveDirection) {
+        self.velocity -= rhs.direction().as_f32();
+    }
+}
+
 impl Mul<f32> for Velocity {
-    type Output = Velocity;
+    type Output = Self;
 
     fn mul(self, rhs: f32) -> Self::Output {
         (self.velocity * rhs).into()
+    }
+}
+
+impl Div<f32> for Velocity {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        (self.velocity / rhs).into()
     }
 }

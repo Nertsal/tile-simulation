@@ -84,6 +84,72 @@ impl Calculator {
             self.update_chunks(update_queue.into_par_iter());
         }
 
+        // Collect collision information
+        let mut collisions = self
+            .calculations
+            .par_iter()
+            .map(|(&chunk_pos, (calculation, _))| {
+                let chunk = chunks.get(&chunk_pos).unwrap();
+                let mut collisions = Vec::with_capacity(calculation.collisions.len() * 2);
+                let chunk_collisions = Mutex::new(&mut collisions);
+
+                calculation
+                    .collisions
+                    .par_iter()
+                    .for_each(|&(tile, other)| {
+                        let result = chunk.tile_info[tile]
+                            .as_ref()
+                            .unwrap()
+                            .collide(chunk.tile_info[other].as_ref().unwrap());
+                        let mut chunk_collisions = chunk_collisions.lock().unwrap();
+                        chunk_collisions.push((tile, result.0, result.1, result.2));
+                        chunk_collisions.push((other, result.3, result.4, result.5));
+                    });
+
+                (chunk_pos, collisions)
+            })
+            .collect::<HashMap<_, _>>();
+
+        // Collect cross-chunk collision information
+        let chunk_collisions = Mutex::new(&mut collisions);
+        self.calculations
+            .par_iter()
+            .for_each(|(&chunk_pos, (calculation, _))| {
+                let chunk = chunks.get(&chunk_pos).unwrap();
+                calculation
+                    .cross_collisions
+                    .par_iter()
+                    .for_each(|&(index, tile)| {
+                        if let Some(other_chunk) = chunks.get(&tile.chunk_pos) {
+                            if let Some(other) = &other_chunk.tile_info[tile.index] {
+                                let result =
+                                    chunk.tile_info[index].as_ref().unwrap().collide(other);
+                                let mut collisions = chunk_collisions.lock().unwrap();
+                                collisions
+                                    .get_mut(&chunk_pos)
+                                    .unwrap()
+                                    .push((index, result.0, result.1, result.2));
+                                collisions
+                                    .get_mut(&tile.chunk_pos)
+                                    .unwrap()
+                                    .push((tile.index, result.3, result.4, result.5));
+                            }
+                        }
+                    });
+            });
+
+        // Update tile information according to collisions
+        chunks.par_iter_mut().for_each(|(chunk_pos, chunk)| {
+            if let Some(collisions) = collisions.get(chunk_pos) {
+                for &(update_index, velocity, process_velocity, tick_velocity) in collisions {
+                    let tile = chunk.tile_info[update_index].as_mut().unwrap();
+                    tile.velocity = velocity;
+                    tile.process_velocity = process_velocity;
+                    tile.tick_velocity = tick_velocity;
+                }
+            }
+        });
+
         // Collect movement
         let ((mut chunk_moves, mut view_updates), cross_moves) = chunks
             .par_iter_mut()
