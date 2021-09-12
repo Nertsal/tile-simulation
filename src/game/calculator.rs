@@ -16,8 +16,8 @@ type ChunkInformation<'a, 'b> = (
     &'b mut &'a mut Chunk,
     ChunkCalculation,
     Dependencies,
-    Option<DataArray<bool>>,             // Extra updates
-    Option<DataArray<Option<TileInfo>>>, // Cross-chunk moves
+    Option<DataArray<bool>>, // Extra updates
+    Option<DataArray<bool>>, // Cross-chunk moves
 );
 
 pub type ViewUpdates = HashMap<IVec2, DataArray<Option<Option<TileInfo>>>>;
@@ -25,7 +25,7 @@ pub type ViewUpdates = HashMap<IVec2, DataArray<Option<Option<TileInfo>>>>;
 pub struct Calculator {
     chunk_calculations: HashMap<IVec2, DataArray<MoveInfo>>,
     extra_updates: HashMap<IVec2, DataArray<bool>>,
-    cross_moves: HashMap<IVec2, DataArray<Option<TileInfo>>>,
+    cross_moves: HashMap<IVec2, DataArray<bool>>,
     calculations: HashMap<IVec2, (ChunkCalculation, Dependencies)>,
     update_queue: HashSet<IVec2>,
 }
@@ -84,18 +84,51 @@ impl Calculator {
             self.update_chunks(update_queue.into_par_iter());
         }
 
-        // Perform movement and collect view updates
-        let mut chunks_done = 0;
-        for (chunk_pos, chunk) in chunks {
-            let (calculation, _) = self.calculations.remove(chunk_pos).unwrap();
-            if chunk.movement(calculation.moves_to) {
-                chunks_done += 1;
-            }
+        // Collect movement
+        let ((mut chunk_moves, mut view_updates), cross_moves) = chunks
+            .par_iter_mut()
+            .map(|(chunk_pos, chunk)| {
+                let (local_moves, cross_moves, view_updates) =
+                    chunk.collect_movement(&self.calculations[chunk_pos].0);
+                (
+                    ((*chunk_pos, local_moves), (*chunk_pos, view_updates)),
+                    cross_moves,
+                )
+            })
+            .collect::<((HashMap<_, _>, HashMap<_, _>), Vec<_>)>();
+
+        // Collect cross-chunk moves
+        for (cross_move, cross_tile) in cross_moves
+            .into_iter()
+            .map(|cross_moves| cross_moves.into_iter())
+            .flatten()
+        {
+            let chunk_moves = chunk_moves.get_mut(&cross_move.chunk_pos).unwrap();
+            chunk_moves[cross_move.index] = Some(cross_tile);
+        }
+
+        // Perform movement
+        let chunk_moves = Mutex::new((chunk_moves, &mut view_updates));
+        let chunks_done: usize = chunks
+            .par_iter_mut()
+            .map(|(chunk_pos, chunk)| {
+                let mut chunk_moves = chunk_moves.lock().unwrap();
+                let moves = chunk_moves.0.remove(chunk_pos).unwrap();
+                if chunk.movement(moves, chunk_moves.1.get_mut(chunk_pos).unwrap()) {
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum();
+
+        // Collect view updates
+        for chunk_pos in chunks.keys() {
             let view_update = view_update
                 .entry(*chunk_pos)
                 .or_insert_with(|| default_data_array());
-            for (index, update) in calculation
-                .view_update
+            let updates = view_updates.remove(chunk_pos).unwrap();
+            for (index, update) in updates
                 .into_iter()
                 .enumerate()
                 .filter_map(|(index, update)| update.map(|update| (index, update)))
@@ -157,7 +190,7 @@ impl Calculator {
         chunk_pos: IVec2,
         chunk_updates: DataArray<Option<MoveInfo>>,
         extra_updates: Vec<Tile>,
-        cross_moves: HashMap<Tile, TileInfo>,
+        cross_moves: HashSet<Tile>,
         dependencies: &mut Dependencies,
         tile_dependencies: &DataArray<Option<Tile>>,
     ) {
@@ -182,9 +215,9 @@ impl Calculator {
         }
 
         // Register cross moves
-        for (cross_tile, cross_tile_info) in cross_moves {
+        for cross_tile in cross_moves {
             if let Some(cross_moves) = self.cross_moves.get_mut(&cross_tile.chunk_pos) {
-                cross_moves[cross_tile.index] = Some(cross_tile_info);
+                cross_moves[cross_tile.index] = true;
                 // Queue chunk update
                 self.update_queue.insert(cross_tile.chunk_pos);
             }
@@ -247,7 +280,7 @@ impl Calculator {
     fn take_updates_moves(
         &mut self,
         chunk_pos: &IVec2,
-    ) -> (Option<DataArray<bool>>, Option<DataArray<Option<TileInfo>>>) {
+    ) -> (Option<DataArray<bool>>, Option<DataArray<bool>>) {
         (
             self.extra_updates
                 .get_mut(&chunk_pos)

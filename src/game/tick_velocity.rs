@@ -17,29 +17,16 @@ impl TickVelocity {
     pub fn directions(&self) -> Vec<TileMoveDirection> {
         let mut moves = Vec::new();
 
-        // Get x component
-        let x = if self.velocity.x.abs() >= 1 {
+        // Horizontal move
+        if self.velocity.x.abs() >= 1 {
             let x = self.velocity.x.signum() as i32;
-            // Push horizontal move
             moves.push(ivec2(x, 0).into());
-            x
-        } else {
-            0
-        };
+        }
 
-        // Get y component
-        let y = if self.velocity.y.abs() >= 1 {
+        // Vertical move
+        if self.velocity.y.abs() >= 1 {
             let y = self.velocity.y.signum() as i32;
-            // Push vertical move
             moves.push(ivec2(0, y).into());
-            y
-        } else {
-            0
-        };
-
-        // Push diagonal move
-        if x != 0 && y != 0 {
-            moves.push(ivec2(x, y).into());
         }
 
         moves

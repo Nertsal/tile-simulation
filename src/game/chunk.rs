@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use macroquad::prelude::{ivec2, uvec2, IVec2, UVec2};
 
@@ -9,6 +9,8 @@ use super::tile::{Tile, TileInfo};
 pub type Dependencies = HashMap<Tile, MoveInfo>;
 
 pub type DataArray<T> = Vec<T>;
+
+// TODO: trait DataArrayTrait
 
 pub fn data_array<T: Copy>(default_value: T) -> DataArray<T> {
     let mut data_array = Vec::with_capacity(CHUNK_SIZE);
@@ -100,6 +102,7 @@ impl Chunk {
             checked: data_array(false),
             moves_from: data_array(false),
             moves: data_array(None),
+            cross_moves: default_data_array(),
             moves_to: default_data_array(),
             update_tiles: {
                 let mut update_tiles = Vec::new();
@@ -116,7 +119,6 @@ impl Chunk {
             },
             unknown: data_array(false),
             dependencies: default_data_array(),
-            view_update: default_data_array(),
         };
 
         (calculation, HashMap::new())
@@ -127,8 +129,8 @@ impl Chunk {
         calculation: &mut ChunkCalculation,
         dependencies: &mut Dependencies,
         updates: Option<DataArray<bool>>,
-        cross_moves: Option<DataArray<Option<TileInfo>>>,
-    ) -> (Vec<Option<MoveInfo>>, Vec<Tile>, HashMap<Tile, TileInfo>) {
+        cross_moves: Option<DataArray<bool>>,
+    ) -> (Vec<Option<MoveInfo>>, Vec<Tile>, HashSet<Tile>) {
         // Register extra updates
         if let Some(updates) = updates {
             for update_index in updates
@@ -144,13 +146,12 @@ impl Chunk {
 
         // Register cross-chunk moves
         if let Some(cross_moves) = cross_moves {
-            for (move_to, tile_info) in cross_moves
+            for (move_to, _) in cross_moves
                 .into_iter()
                 .enumerate()
-                .filter_map(|(index, tile_info)| tile_info.map(|tile_info| (index, tile_info)))
+                .filter(|&(_, cross_move)| cross_move)
             {
-                calculation.view_update[move_to] = Some(Some(tile_info.clone()));
-                calculation.moves_to[move_to] = Some(tile_info);
+                calculation.moves_to[move_to] = true;
                 self.need_update[move_to] = true;
             }
         }
@@ -178,7 +179,7 @@ impl Chunk {
         // Calculate tiles
         let mut chunk_updates = data_array(None);
         let mut extra_updates = Vec::new();
-        let mut cross_moves = HashMap::new();
+        let mut cross_moves = HashSet::new();
         while !calculation.update_tiles.is_empty() {
             let update_index = calculation.update_tiles.remove(0);
             let move_info = self.calculate_tile(
@@ -199,13 +200,13 @@ impl Chunk {
         update_index: usize,
         calculation: &mut ChunkCalculation,
         extra_updates: &mut Vec<Tile>,
-        cross_moves: &mut HashMap<Tile, TileInfo>,
+        cross_moves: &mut HashSet<Tile>,
         dependencies: &mut Dependencies,
     ) -> MoveInfo {
         // If this tile couldn't move last frame
         // or another tile is going to move here,
         // then movement is not allowed
-        if self.cant_move[update_index] || calculation.moves_to[update_index].is_some() {
+        if self.cant_move[update_index] || calculation.moves_to[update_index] {
             return MoveInfo::Impossible;
         }
 
@@ -260,20 +261,11 @@ impl Chunk {
                             calculation.dependencies[update_index] = None;
 
                             // Register the move
-                            let mut tile_info =
-                                std::mem::take(self.tile_info.get_mut(update_index).unwrap())
-                                    .unwrap();
+                            let tile_info = self.tile_info[update_index].as_mut().unwrap();
                             tile_info.tick_velocity -= direction;
                             calculation.moves[update_index] = Some(target_index);
                             calculation.moves_from[update_index] = true;
-                            calculation.moves_to[target_index] = Some(tile_info.clone());
                             self.cant_move[update_index] = false;
-
-                            // Update view
-                            calculation.view_update[target_index] = Some(Some(tile_info));
-                            if calculation.moves_to[update_index].is_none() {
-                                calculation.view_update[update_index] = Some(None);
-                            }
 
                             // Queue update for the next frame
                             self.need_update[target_index] = true;
@@ -321,17 +313,11 @@ impl Chunk {
                             }
                             MoveInfo::Possible => {
                                 // Register the move
-                                let mut tile_info =
-                                    std::mem::take(self.tile_info.get_mut(update_index).unwrap())
-                                        .unwrap();
+                                let tile_info = self.tile_info[update_index].as_mut().unwrap();
                                 tile_info.tick_velocity -= direction;
-                                cross_moves.insert(tile, tile_info);
+                                cross_moves.insert(tile);
+                                calculation.cross_moves[update_index] = Some(tile);
                                 calculation.moves_from[update_index] = true;
-
-                                // Update view
-                                if calculation.moves_to[update_index].is_none() {
-                                    calculation.view_update[update_index] = Some(None);
-                                }
 
                                 // Update nearby lazy tiles
                                 self.update_tiles_around(
@@ -452,18 +438,69 @@ impl Chunk {
         }
     }
 
-    pub fn movement(&mut self, moves: DataArray<Option<TileInfo>>) -> bool {
+    pub fn collect_movement(
+        &mut self,
+        calculation: &ChunkCalculation,
+    ) -> (
+        DataArray<Option<TileInfo>>,
+        HashMap<Tile, TileInfo>,
+        DataArray<Option<Option<TileInfo>>>,
+    ) {
+        // Clear view update
+        let mut view_update = default_data_array();
+        for move_from in calculation
+            .moves_from
+            .iter()
+            .enumerate()
+            .filter_map(|(move_from, &do_move)| if do_move { Some(move_from) } else { None })
+        {
+            view_update[move_from] = Some(None);
+        }
+
+        // Collect chunk moves
+        let mut local_moves = default_data_array();
+        for (move_from, move_to) in calculation
+            .moves
+            .iter()
+            .enumerate()
+            .filter_map(|(move_from, move_to)| move_to.map(|move_to| (move_from, move_to)))
+        {
+            let tile_info = self.tile_info[move_from].take().unwrap();
+            local_moves[move_to] = Some(tile_info);
+        }
+
+        // Collect cross-chunk moves
+        let mut cross_moves = HashMap::with_capacity(calculation.cross_moves.len());
+        for (index_from, tile_to) in calculation
+            .cross_moves
+            .iter()
+            .enumerate()
+            .filter_map(|(move_from, tile_to)| tile_to.map(|tile_to| (move_from, tile_to)))
+        {
+            let tile_info = self.tile_info[index_from].take().unwrap();
+            cross_moves.insert(tile_to, tile_info);
+        }
+
+        (local_moves, cross_moves, view_update)
+    }
+
+    pub fn movement(
+        &mut self,
+        moves: DataArray<Option<TileInfo>>,
+        view_update: &mut DataArray<Option<Option<TileInfo>>>,
+    ) -> bool {
         // Perform moves
         for (index, tile_info) in moves
             .into_iter()
             .enumerate()
             .filter_map(|(index, tile_info)| tile_info.map(|tile_info| (index, tile_info)))
         {
+            view_update[index] = Some(Some(tile_info.clone()));
             self.tile_info[index] = Some(tile_info);
         }
 
         // Sync tiles and tile_info
-        // done means whether all tiles have moved the distance they had to
+        // done means whether all tiles have completed their movement
         let mut done = true;
         for (index, tile) in self.tile_info.iter().enumerate() {
             self.tiles[index] = tile.is_some();
@@ -490,9 +527,9 @@ pub struct ChunkCalculation {
     checked: DataArray<bool>,
     moves_from: DataArray<bool>,
     moves: DataArray<Option<usize>>,
-    pub moves_to: DataArray<Option<TileInfo>>,
+    pub cross_moves: DataArray<Option<Tile>>,
+    pub moves_to: DataArray<bool>,
     update_tiles: Vec<usize>,
     unknown: DataArray<bool>,
     pub dependencies: DataArray<Option<Tile>>,
-    pub view_update: DataArray<Option<Option<TileInfo>>>,
 }

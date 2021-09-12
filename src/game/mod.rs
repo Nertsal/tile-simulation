@@ -107,6 +107,7 @@ impl Game {
             self.set_tile(
                 self.mouse_over_tile(),
                 selected_tile.map(|tile_type| TileInfo {
+                    mass: 1.0,
                     gravity_scale: vec2(0.0, -1.0),
                     velocity: ((mouse_pos - self.last_mouse_pos) / delta_time / 50.0
                         + vec2(0.0, -1.0))

@@ -19,6 +19,7 @@ impl Tile {
 
 #[derive(Clone, Debug)]
 pub struct TileInfo {
+    pub mass: f32,
     pub gravity_scale: Vec2,
     pub velocity: Velocity,
     pub process_velocity: Velocity,
