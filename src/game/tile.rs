@@ -2,7 +2,10 @@ use macroquad::prelude::{ivec2, vec2, IVec2, Vec2};
 
 use crate::constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y, TICK_GRAVITY};
 
-use super::{chunk::tile_index_to_position, tick_velocity::TickVelocity, velocity::Velocity};
+use super::{
+    chunk::tile_index_to_position, tick_velocity::TickVelocity,
+    tile_move_direction::TileMoveDirection, velocity::Velocity,
+};
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub struct Tile {
@@ -48,6 +51,26 @@ impl TileInfo {
         self.tick_moves = self.tick_velocity.moves();
     }
 
+    pub fn zero(&mut self) {
+        self.velocity = Vec2::ZERO.into();
+        self.process_velocity = Vec2::ZERO.into();
+        self.tick_velocity = IVec2::ZERO.into();
+        self.tick_moves = 0;
+    }
+
+    pub fn reset_velocity(&mut self, direction: TileMoveDirection) {
+        let direction = direction.direction().as_f32();
+        let projection = direction * direction.dot(self.velocity.velocity);
+        self.velocity -= projection;
+
+        self.process_velocity += Velocity::from(self.tick_velocity);
+        let projection = direction * direction.dot(self.process_velocity.velocity);
+        self.process_velocity -= projection;
+
+        self.tick_velocity = self.process_velocity.tick_velocity();
+        self.tick_moves = self.tick_velocity.moves();
+    }
+
     pub fn lazy(&mut self) {
         self.velocity = (self.gravity_scale * TICK_GRAVITY).into();
     }
@@ -82,14 +105,12 @@ impl TileInfo {
         // Update tick and process velocity
         let mut tile_process_velocity = self.process_velocity;
         let mut tile_tick_velocity = self.tick_velocity;
-        tile_process_velocity +=
-            <TickVelocity as Into<Velocity>>::into(tile_tick_velocity) * coef_tile;
+        tile_process_velocity += Velocity::from(tile_tick_velocity) * coef_tile;
         tile_tick_velocity = tile_process_velocity.tick_velocity();
 
         let mut other_process_velocity = other.process_velocity;
         let mut other_tick_velocity = other.tick_velocity;
-        other_process_velocity +=
-            <TickVelocity as Into<Velocity>>::into(other_tick_velocity) * coef_other;
+        other_process_velocity += Velocity::from(other_tick_velocity) * coef_other;
         other_tick_velocity = other_process_velocity.tick_velocity();
 
         (

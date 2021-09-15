@@ -10,10 +10,6 @@ pub struct Velocity {
 }
 
 impl Velocity {
-    pub fn is_close_zero(&self) -> bool {
-        self.velocity.x.abs() <= 0.1 && self.velocity.y.abs() <= 0.1
-    }
-
     pub fn tick_velocity(&mut self) -> TickVelocity {
         let x = self.velocity.x.abs().floor() * self.velocity.x.signum();
         let y = self.velocity.y.abs().floor() * self.velocity.y.signum();
@@ -25,6 +21,14 @@ impl Velocity {
 impl From<Vec2> for Velocity {
     fn from(velocity: Vec2) -> Self {
         Self { velocity }
+    }
+}
+
+impl From<TickVelocity> for Velocity {
+    fn from(velocity: TickVelocity) -> Self {
+        Self {
+            velocity: velocity.velocity.as_f32(),
+        }
     }
 }
 
