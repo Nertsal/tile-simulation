@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 use macroquad::prelude::{ivec2, vec2, Vec2};
 
@@ -86,10 +86,22 @@ impl Mul<f32> for Velocity {
     }
 }
 
+impl MulAssign<f32> for Velocity {
+    fn mul_assign(&mut self, rhs: f32) {
+        self.velocity *= rhs;
+    }
+}
+
 impl Div<f32> for Velocity {
     type Output = Self;
 
     fn div(self, rhs: f32) -> Self::Output {
         (self.velocity / rhs).into()
+    }
+}
+
+impl DivAssign<f32> for Velocity {
+    fn div_assign(&mut self, rhs: f32) {
+        self.velocity /= rhs;
     }
 }

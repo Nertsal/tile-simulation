@@ -1,6 +1,6 @@
 use macroquad::prelude::{ivec2, vec2, IVec2, Vec2};
 
-use crate::constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y, TICK_GRAVITY};
+use crate::constants::{CHUNK_SIZE_X, CHUNK_SIZE_Y, DRAG, TICK_GRAVITY};
 
 use super::{
     chunk::tile_index_to_position, tick_velocity::TickVelocity,
@@ -44,8 +44,13 @@ impl TileInfo {
         }
     }
 
+    pub fn gravity(&self) -> Vec2 {
+        self.gravity_scale * TICK_GRAVITY
+    }
+
     pub fn prepare_tick(&mut self) {
-        self.velocity += self.gravity_scale * TICK_GRAVITY;
+        self.velocity += self.gravity();
+        self.velocity *= 1.0 - DRAG;
         self.process_velocity += self.velocity;
         self.tick_velocity = self.process_velocity.tick_velocity();
         self.tick_moves = self.tick_velocity.moves();
