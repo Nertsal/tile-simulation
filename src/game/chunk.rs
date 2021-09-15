@@ -339,11 +339,7 @@ impl Chunk {
                                     direction: *direction,
                                 };
                             }
-                            MoveInfo::Impossible => {
-                                // Reset velocity
-                                let tile = self.tile_info[update_index].as_mut().unwrap();
-                                tile.zero();
-                            }
+                            MoveInfo::Impossible => {}
                             MoveInfo::Recursive => {
                                 // Reset dependency
                                 if is_current_dependency {
