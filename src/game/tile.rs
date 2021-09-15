@@ -51,13 +51,6 @@ impl TileInfo {
         self.tick_moves = self.tick_velocity.moves();
     }
 
-    pub fn zero(&mut self) {
-        self.velocity = Vec2::ZERO.into();
-        self.process_velocity = Vec2::ZERO.into();
-        self.tick_velocity = IVec2::ZERO.into();
-        self.tick_moves = 0;
-    }
-
     pub fn reset_velocity(&mut self, direction: TileMoveDirection) {
         let direction = direction.direction().as_f32();
         let projection = direction * direction.dot(self.velocity.velocity);
