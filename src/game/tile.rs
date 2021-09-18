@@ -49,17 +49,31 @@ impl TileInfo {
     }
 
     pub fn prepare_tick(&mut self) {
-        self.velocity += self.gravity();
         self.velocity *= 1.0 - DRAG;
+        self.velocity += self.gravity();
         self.process_velocity += self.velocity;
         self.tick_velocity = self.process_velocity.tick_velocity();
         self.tick_moves = self.tick_velocity.moves();
     }
 
-    pub fn reset_velocity(&mut self, direction: TileMoveDirection) {
-        let direction = direction.direction().as_f32();
+    pub fn hit_wall(&mut self, direction: TileMoveDirection, friction: f32) {
+        // Remove velocity's component in given direction
+        let direction = direction.direction().as_f32().normalize_or_zero();
         let projection = direction * direction.dot(self.velocity.velocity);
         self.velocity -= projection;
+        let perpendicular = projection.perp();
+
+        // Friction
+        let perp_norm = perpendicular.normalize_or_zero();
+        let perp_norm_dot = perp_norm.dot(self.velocity.velocity);
+        let friction_vec =
+            (perpendicular * perp_norm_dot * friction).clamp_length_max(perp_norm_dot);
+        self.velocity -= friction_vec;
+
+        // Redirect velocity perpendicular to direction
+        let perp_dot = perpendicular.dot(self.velocity.velocity);
+        let perpendicular = perpendicular * perp_dot.signum();
+        self.velocity += perpendicular * self.tile_type.redirect_coef();
 
         self.process_velocity += Velocity::from(self.tick_velocity);
         let projection = direction * direction.dot(self.process_velocity.velocity);
@@ -70,7 +84,7 @@ impl TileInfo {
     }
 
     pub fn lazy(&mut self) {
-        self.velocity = (self.gravity_scale * TICK_GRAVITY).into();
+        self.velocity = self.gravity().into();
     }
 
     pub fn collide(
@@ -127,4 +141,26 @@ pub enum TileType {
     Barrier,
     Sand,
     Water,
+}
+
+impl TileType {
+    pub fn friction_coef(&self) -> f32 {
+        match self {
+            Self::Barrier => 0.5,
+            Self::Sand => 0.7,
+            Self::Water => 0.1,
+        }
+    }
+
+    pub fn friction_between(&self, other_coef: f32) -> f32 {
+        (self.friction_coef() + other_coef).min(1.0)
+    }
+
+    fn redirect_coef(&self) -> f32 {
+        match self {
+            Self::Barrier => 0.0,
+            Self::Sand => 0.0,
+            Self::Water => 0.1,
+        }
+    }
 }

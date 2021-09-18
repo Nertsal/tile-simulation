@@ -211,11 +211,17 @@ impl Chunk {
         dependencies: &mut Dependencies,
         collisions: &mut Vec<(TileInfo, Tile)>,
     ) -> MoveInfo {
+        let friction_coef = self.tile_info[update_index]
+            .as_ref()
+            .map(|tile| tile.tile_type.friction_coef())
+            .unwrap_or(0.0);
+
         // If collision calculated,
         // then perform collision
         if let Some(direction) = calculation.collision[update_index] {
             return MoveInfo::Collision {
                 direction: Some(direction),
+                friction_coef,
             };
         }
 
@@ -225,6 +231,7 @@ impl Chunk {
         if self.cant_move[update_index].is_some() || calculation.moves_to[update_index] {
             return MoveInfo::Collision {
                 direction: self.cant_move[update_index],
+                friction_coef,
             };
         }
 
@@ -246,7 +253,10 @@ impl Chunk {
         let checked = calculation.checked[update_index];
         calculation.checked[update_index] = true;
         if checked {
-            return MoveInfo::Collision { direction: None };
+            return MoveInfo::Collision {
+                direction: None,
+                friction_coef,
+            };
         }
 
         // Check for possible moves
@@ -268,16 +278,26 @@ impl Chunk {
                             calculation.unknown[update_index] = true;
                             return MoveInfo::Unknown;
                         }
-                        MoveInfo::Collision { direction } => {
+                        MoveInfo::Collision {
+                            direction,
+                            friction_coef,
+                        } => {
+                            let tile = self.tile_info[update_index].as_mut().unwrap();
+
                             if let Some(direction) = direction {
                                 calculation.collision[update_index] = Some(direction);
                                 // Reset velocity
-                                let tile = self.tile_info[update_index].as_mut().unwrap();
-                                tile.reset_velocity(direction);
+                                tile.hit_wall(
+                                    direction,
+                                    tile.tile_type.friction_between(friction_coef),
+                                );
                             }
 
                             calculation.collisions.push((update_index, target_index));
-                            return MoveInfo::Collision { direction };
+                            return MoveInfo::Collision {
+                                direction,
+                                friction_coef: tile.tile_type.friction_coef(),
+                            };
                         }
                         MoveInfo::Impossible => unreachable!(),
                         MoveInfo::Recursive => unreachable!(),
@@ -325,18 +345,25 @@ impl Chunk {
                                 calculation.unknown[update_index] = true;
                                 return MoveInfo::Unknown;
                             }
-                            MoveInfo::Collision { direction } => {
+                            MoveInfo::Collision {
+                                direction,
+                                friction_coef,
+                            } => {
+                                let update_tile = self.tile_info[update_index].as_mut().unwrap();
+
                                 if let Some(direction) = *direction {
                                     calculation.collision[update_index] = Some(direction);
                                     // Reset velocity
-                                    let update_tile =
-                                        self.tile_info[update_index].as_mut().unwrap();
-                                    update_tile.reset_velocity(direction);
+                                    update_tile.hit_wall(
+                                        direction,
+                                        update_tile.tile_type.friction_between(*friction_coef),
+                                    );
                                 }
 
                                 calculation.cross_collisions.push((update_index, tile));
                                 return MoveInfo::Collision {
                                     direction: *direction,
+                                    friction_coef: update_tile.tile_type.friction_coef(),
                                 };
                             }
                             MoveInfo::Impossible => {}
@@ -370,12 +397,13 @@ impl Chunk {
 
             // No possible moves
             let tile = self.tile_info[update_index].as_mut().unwrap();
-            tile.reset_velocity(direction);
+            tile.hit_wall(direction, 0.0);
             self.cant_move[update_index] = Some(direction);
             calculation.collision[update_index] = Some(direction);
             // self.need_update[update_index] = false;
             return MoveInfo::Collision {
                 direction: Some(direction),
+                friction_coef: tile.tile_type.friction_coef(),
             };
         }
 
@@ -390,7 +418,10 @@ impl Chunk {
         // if !need_update {
         //     tile.lazy();
         // }
-        MoveInfo::Collision { direction: None }
+        MoveInfo::Collision {
+            direction: None,
+            friction_coef: 0.0,
+        }
     }
 
     fn queue_updates_around(&mut self, index: usize, distance: i32) -> Vec<Tile> {
@@ -571,6 +602,7 @@ pub enum MoveInfo {
     Recursive,
     Collision {
         direction: Option<TileMoveDirection>,
+        friction_coef: f32,
     },
     Possible,
 }

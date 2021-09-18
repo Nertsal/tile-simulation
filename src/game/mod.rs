@@ -107,11 +107,12 @@ impl Game {
             self.set_tile(
                 self.mouse_over_tile(),
                 selected_tile.map(|tile_type| {
-                    TileInfo::new(
-                        tile_type,
-                        ((mouse_pos - self.last_mouse_pos) / delta_time / 50.0 + vec2(0.0, -1.0))
-                            .into(),
-                    )
+                    let mouse_velocity = (mouse_pos - self.last_mouse_pos) / delta_time / 50.0;
+                    let random_x = macroquad::rand::gen_range(0.01, 0.1)
+                        * (macroquad::rand::gen_range(0, 2) * 2 - 1) as f32;
+                    let extra_velocity = vec2(random_x, -1.0);
+                    let velocity = mouse_velocity + extra_velocity;
+                    TileInfo::new(tile_type, velocity.into())
                 }),
             );
         }
