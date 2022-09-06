@@ -8,12 +8,17 @@ use data_array::*;
 pub use position::*;
 
 const WIDTH: usize = 10;
+const GRAVITY: Vec2<f32> = vec2(0.0, -0.5);
+
+type Coord = R32;
 
 pub struct Model {
     tiles: DataArray<Tile>,
+    velocities: DataArray<Vec2<Coord>>,
+    tick_velocities: DataArray<Vec2<Coord>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Tile {
     Empty,
     Sand,
@@ -23,6 +28,8 @@ impl Model {
     pub fn new() -> Self {
         Self {
             tiles: DataArray::new(100, Tile::Empty),
+            velocities: DataArray::new(100, Vec2::ZERO),
+            tick_velocities: DataArray::new(100, Vec2::ZERO),
         }
     }
 
@@ -38,7 +45,7 @@ impl Model {
     }
 
     pub fn set_tile(&mut self, tile_pos: Position, new_tile: Tile) {
-        if let Some(tile) = self.tiles.get_mut(tile_pos.index(WIDTH)) {
+        if let Some(tile) = self.tiles.get_mut(tile_pos.to_index(WIDTH)) {
             *tile = new_tile
         }
     }

@@ -13,7 +13,7 @@ impl Position {
         }
     }
 
-    pub fn index(self, width: usize) -> usize {
+    pub fn to_index(self, width: usize) -> usize {
         self.position.x + self.position.y * width
     }
 }

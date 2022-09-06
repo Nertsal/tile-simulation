@@ -26,7 +26,7 @@ impl Game {
             position.map(|x| x as f32),
         );
         if let Some(tile_pos) = self.tile_pos(world_pos) {
-            self.model.set_tile(tile_pos, self.selected_tile.clone());
+            self.model.set_tile(tile_pos, self.selected_tile);
         }
     }
 
