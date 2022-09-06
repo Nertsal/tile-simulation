@@ -4,6 +4,7 @@ const FIXED_DELTA_TIME: f64 = 1.0 / 30.0;
 
 mod game;
 mod model;
+mod render;
 
 fn main() {
     logger::init().unwrap();
@@ -14,7 +15,7 @@ fn main() {
         ..default()
     });
 
-    let game = game::Game::new();
+    let game = game::Game::new(&geng);
 
     geng::run(&geng, game)
 }
