@@ -4,7 +4,7 @@ use crate::model::*;
 
 use super::*;
 
-const GRID_WIDTH: f32 = 0.05;
+const GRID_WIDTH: f32 = 0.07;
 const GRID_COLOR: Color<f32> = Color::GRAY;
 pub const TILE_SIZE: Vec2<f32> = vec2(1.0, 1.0);
 
@@ -20,7 +20,7 @@ impl Render {
             camera: Camera2d {
                 center: vec2(5.0, 5.0),
                 rotation: 0.0,
-                fov: 20.0,
+                fov: 60.0,
             },
         }
     }

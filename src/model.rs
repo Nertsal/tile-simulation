@@ -7,7 +7,7 @@ mod tick;
 use data_array::*;
 pub use position::*;
 
-const WIDTH: usize = 10;
+const WIDTH: usize = 30;
 const GRAVITY: Vec2<f32> = vec2(0.0, -0.5);
 
 type Coord = R32;
@@ -26,15 +26,21 @@ pub enum Tile {
 
 impl Model {
     pub fn new() -> Self {
+        let size = WIDTH * WIDTH;
         Self {
-            tiles: DataArray::new(100, Tile::Empty),
-            velocities: DataArray::new(100, Vec2::ZERO),
-            tick_velocities: DataArray::new(100, Vec2::ZERO),
+            tiles: DataArray::new(size, Tile::Empty),
+            velocities: DataArray::new(size, Vec2::ZERO),
+            tick_velocities: DataArray::new(size, Vec2::ZERO),
         }
     }
 
     pub fn get_size(&self) -> Vec2<usize> {
         vec2(WIDTH, WIDTH)
+    }
+
+    pub fn get_tiles_count(&self) -> usize {
+        let size = self.get_size();
+        size.x * size.y
     }
 
     pub fn get_tiles(&self) -> impl Iterator<Item = (Position, &Tile)> {

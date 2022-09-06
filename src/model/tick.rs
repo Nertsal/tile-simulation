@@ -33,9 +33,9 @@ impl Model {
 
     fn calculate_movement(&mut self) -> DataArray<usize> {
         let mut calculation = Calculation {
-            queued: (0..100).collect(),
-            state: DataArray::new(100, TileMoveInfo::Queued),
-            moves: DataArray::from((0..100).collect::<Vec<usize>>()),
+            queued: (0..self.get_tiles_count()).collect(),
+            state: DataArray::new(self.get_tiles_count(), TileMoveInfo::Queued),
+            moves: DataArray::from((0..self.get_tiles_count()).collect::<Vec<usize>>()),
         };
         while let Some(index) = calculation.queued.pop() {
             self.calculate_tile_move(index, &mut calculation);
@@ -44,7 +44,7 @@ impl Model {
     }
 
     fn perform_movement(&mut self, moves: DataArray<usize>) {
-        let mut new_tiles = DataArray::new(100, Tile::Empty);
+        let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::Empty);
         for (old_index, new_index) in moves.into_iter().enumerate() {
             *new_tiles.get_mut(new_index).expect("Invalid new index") =
                 *self.tiles.get(old_index).expect("Invalid old index");
@@ -71,7 +71,7 @@ impl Model {
         let direction = velocity_direction(*self.velocities.get(tile_index).unwrap());
         if direction != Vec2::ZERO {
             // Try moving tile in the direction
-            match shift_position(tile_index, direction) {
+            match self.shift_position(tile_index, direction) {
                 ShiftedPosition::Valid(position) => {
                     // The target position in valid, so we need to check for collisions.
                     let target_index = position.to_index(self.get_size().x);
@@ -106,6 +106,24 @@ impl Model {
 
         // The tile either has no velocity or has been calculated to stay in place
         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
+    }
+
+    fn shift_position(&self, index: usize, direction: Vec2<isize>) -> ShiftedPosition {
+        let position = Position::from_index(index, WIDTH)
+            .position
+            .map(|x| x as isize)
+            + direction;
+        // TODO: properly check bounds
+        if position.iter().any(|x| *x < 0)
+            || position.x >= self.get_size().x as isize
+            || position.y >= self.get_size().y as isize
+        {
+            ShiftedPosition::OutOfBounds
+        } else {
+            ShiftedPosition::Valid(Position {
+                position: position.map(|x| x as usize),
+            })
+        }
     }
 }
 
@@ -148,19 +166,4 @@ enum ShiftedPosition {
     Valid(Position),
     /// The position is out of bounds of any known valid position.
     OutOfBounds,
-}
-
-fn shift_position(index: usize, direction: Vec2<isize>) -> ShiftedPosition {
-    let position = Position::from_index(index, WIDTH)
-        .position
-        .map(|x| x as isize)
-        + direction;
-    // TODO: properly check bounds
-    if position.iter().any(|x| *x < 0 || *x >= WIDTH as isize) {
-        ShiftedPosition::OutOfBounds
-    } else {
-        ShiftedPosition::Valid(Position {
-            position: position.map(|x| x as usize),
-        })
-    }
 }
