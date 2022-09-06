@@ -10,7 +10,7 @@ pub use position::*;
 const WIDTH: usize = 30;
 const GRAVITY: Vec2<f32> = vec2(0.0, -0.5);
 
-type Coord = R32;
+pub type Coord = R32;
 
 pub struct Model {
     tiles: DataArray<Tile>,
@@ -50,9 +50,11 @@ impl Model {
             .map(|(i, tile)| (Position::from_index(i, WIDTH), tile))
     }
 
-    pub fn set_tile(&mut self, tile_pos: Position, new_tile: Tile) {
-        if let Some(tile) = self.tiles.get_mut(tile_pos.to_index(WIDTH)) {
-            *tile = new_tile
+    pub fn set_tile(&mut self, tile_pos: Position, velocity: Vec2<Coord>, new_tile: Tile) {
+        let index = tile_pos.to_index(WIDTH);
+        if let Some(tile) = self.tiles.get_mut(index) {
+            *tile = new_tile;
+            *self.velocities.get_mut(index).unwrap() = velocity;
         }
     }
 }

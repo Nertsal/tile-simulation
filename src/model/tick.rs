@@ -84,6 +84,8 @@ impl Model {
                         *state = TileMoveInfo::Replaced;
                         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
                         *calculation.moves.get_mut(tile_index).unwrap() = target_index;
+                        *self.tick_velocities.get_mut(tile_index).unwrap() -=
+                            direction.map(|x| Coord::new(x as f32));
                         return;
                     } else {
                         // The target tile is occupied either by the target tile itself or by another tile

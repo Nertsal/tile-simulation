@@ -9,6 +9,7 @@ pub struct Game {
     render: Render,
     framebuffer_size: Vec2<usize>,
     selected_tile: Tile,
+    last_mouse_pos: Vec2<f64>,
 }
 
 impl Game {
@@ -19,6 +20,7 @@ impl Game {
             render: Render::new(geng),
             framebuffer_size: vec2(1, 1),
             selected_tile: Tile::Empty,
+            last_mouse_pos: Vec2::ZERO,
         }
     }
 
@@ -58,9 +60,16 @@ impl geng::State for Game {
                 position.map(|x| x as f32),
             );
             if let Some(tile_pos) = self.tile_pos(world_pos) {
-                self.model.set_tile(tile_pos, self.selected_tile);
+                let last_mouse_pos = self.render.camera.screen_to_world(
+                    self.framebuffer_size.map(|x| x as f32),
+                    self.last_mouse_pos.map(|x| x as f32),
+                );
+                let velocity = (world_pos - last_mouse_pos).map(Coord::new);
+                self.model.set_tile(tile_pos, velocity, self.selected_tile);
             }
         }
+
+        self.last_mouse_pos = self.geng.window().mouse_pos();
     }
 
     fn fixed_update(&mut self, _delta_time: f64) {
