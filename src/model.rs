@@ -24,6 +24,10 @@ impl Position {
             position: vec2(index % width, index / width),
         }
     }
+
+    pub fn index(self, width: usize) -> usize {
+        self.position.x + self.position.y * width
+    }
 }
 
 pub struct DataArray2d<T> {
@@ -47,6 +51,10 @@ impl<T> DataArray2d<T> {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.inner.iter_mut()
     }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.inner.get_mut(index)
+    }
 }
 
 impl Model {
@@ -65,5 +73,11 @@ impl Model {
             .iter()
             .enumerate()
             .map(|(i, tile)| (Position::from_index(i, WIDTH), tile))
+    }
+
+    pub fn set_tile(&mut self, tile_pos: Position, new_tile: Tile) {
+        if let Some(tile) = self.tiles.get_mut(tile_pos.index(WIDTH)) {
+            *tile = new_tile
+        }
     }
 }

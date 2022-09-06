@@ -6,11 +6,11 @@ use super::*;
 
 const GRID_WIDTH: f32 = 0.05;
 const GRID_COLOR: Color<f32> = Color::GRAY;
-const TILE_SIZE: Vec2<f32> = vec2(1.0, 1.0);
+pub const TILE_SIZE: Vec2<f32> = vec2(1.0, 1.0);
 
 pub struct Render {
     geng: Geng,
-    camera: Camera2d,
+    pub camera: Camera2d,
 }
 
 impl Render {
@@ -25,19 +25,30 @@ impl Render {
         }
     }
 
-    pub fn draw(&mut self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+    pub fn draw_model(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
         self.draw_tiles(model, framebuffer);
         self.draw_grid(model, framebuffer);
+    }
+
+    pub fn draw_ui(&self, selected_tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
+        let framebuffer_size = framebuffer.size().map(|x| x as f32);
+        let screen = AABB::ZERO.extend_positive(framebuffer_size);
+        let aabb = AABB::point(screen.bottom_left() + vec2(0.1, 0.1) * screen.size())
+            .extend_positive(vec2(0.1, 0.1) * screen.height());
+        let color = tile_color(selected_tile);
+        draw_2d::Quad::new(aabb.extend_uniform(0.05 * aabb.height()), Color::GRAY).draw_2d(
+            &self.geng,
+            framebuffer,
+            &geng::PixelPerfectCamera,
+        );
+        draw_2d::Quad::new(aabb, color).draw_2d(&self.geng, framebuffer, &geng::PixelPerfectCamera);
     }
 
     fn draw_tiles(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
         for (position, tile) in model.get_tiles() {
             let position = position.position.map(|x| x as f32) * TILE_SIZE;
             let aabb = AABB::point(position).extend_positive(TILE_SIZE);
-            let color = match tile {
-                Tile::Empty => Color::TRANSPARENT_BLACK,
-                Tile::Sand => Color::YELLOW,
-            };
+            let color = tile_color(tile);
             draw_2d::Quad::new(aabb, color).draw_2d(&self.geng, framebuffer, &self.camera);
         }
     }
@@ -65,5 +76,12 @@ impl Render {
             )
             .draw_2d(&self.geng, framebuffer, &self.camera);
         }
+    }
+}
+
+fn tile_color(tile: &Tile) -> Color<f32> {
+    match tile {
+        Tile::Empty => Color::TRANSPARENT_BLACK,
+        Tile::Sand => Color::YELLOW,
     }
 }
