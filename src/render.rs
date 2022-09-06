@@ -26,13 +26,27 @@ impl Render {
     }
 
     pub fn draw(&mut self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
-        self.draw_grid(10, 10, framebuffer);
+        self.draw_tiles(model, framebuffer);
+        self.draw_grid(model, framebuffer);
     }
 
-    fn draw_grid(&self, width: usize, height: usize, framebuffer: &mut ugli::Framebuffer) {
-        let bounds = AABB::ZERO.extend_positive(vec2(width, height).map(|x| x as f32) * TILE_SIZE);
+    fn draw_tiles(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+        for (position, tile) in model.get_tiles() {
+            let position = position.position.map(|x| x as f32) * TILE_SIZE;
+            let aabb = AABB::point(position).extend_positive(TILE_SIZE);
+            let color = match tile {
+                Tile::Empty => Color::TRANSPARENT_BLACK,
+                Tile::Sand => Color::YELLOW,
+            };
+            draw_2d::Quad::new(aabb, color).draw_2d(&self.geng, framebuffer, &self.camera);
+        }
+    }
+
+    fn draw_grid(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+        let size = model.get_size();
+        let bounds = AABB::ZERO.extend_positive(size.map(|x| x as f32) * TILE_SIZE);
         // Columns
-        for x in 0..=width {
+        for x in 0..=size.x {
             let x = x as f32 * TILE_SIZE.x;
             draw_2d::Segment::new(
                 Segment::new(vec2(x, bounds.y_min), vec2(x, bounds.y_max)),
@@ -42,7 +56,7 @@ impl Render {
             .draw_2d(&self.geng, framebuffer, &self.camera);
         }
         // Rows
-        for y in 0..=height {
+        for y in 0..=size.y {
             let y = y as f32 * TILE_SIZE.y;
             draw_2d::Segment::new(
                 Segment::new(vec2(bounds.x_min, y), vec2(bounds.x_max, y)),
