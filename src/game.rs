@@ -50,6 +50,10 @@ impl geng::State for Game {
         self.render.draw_ui(&self.selected_tile, framebuffer);
     }
 
+    fn fixed_update(&mut self, _delta_time: f64) {
+        self.model.tick();
+    }
+
     fn handle_event(&mut self, event: geng::Event) {
         match event {
             geng::Event::KeyDown { key } => match key {

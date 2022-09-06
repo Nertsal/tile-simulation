@@ -1,9 +1,16 @@
 use super::*;
 
+mod data_array;
+mod position;
+mod tick;
+
+use data_array::*;
+pub use position::*;
+
 const WIDTH: usize = 10;
 
 pub struct Model {
-    tiles: DataArray2d<Tile>,
+    tiles: DataArray<Tile>,
 }
 
 #[derive(Debug, Clone)]
@@ -12,55 +19,10 @@ pub enum Tile {
     Sand,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Position {
-    // TODO: chunk position
-    pub position: Vec2<usize>,
-}
-
-impl Position {
-    pub fn from_index(index: usize, width: usize) -> Self {
-        Self {
-            position: vec2(index % width, index / width),
-        }
-    }
-
-    pub fn index(self, width: usize) -> usize {
-        self.position.x + self.position.y * width
-    }
-}
-
-pub struct DataArray2d<T> {
-    inner: Vec<T>,
-}
-
-impl<T> DataArray2d<T> {
-    pub fn new(size: usize, default_element: T) -> Self
-    where
-        T: Clone,
-    {
-        Self {
-            inner: vec![default_element; size],
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.inner.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-        self.inner.iter_mut()
-    }
-
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
-        self.inner.get_mut(index)
-    }
-}
-
 impl Model {
     pub fn new() -> Self {
         Self {
-            tiles: DataArray2d::new(100, Tile::Empty),
+            tiles: DataArray::new(100, Tile::Empty),
         }
     }
 
