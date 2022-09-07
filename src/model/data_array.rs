@@ -21,7 +21,7 @@ impl<T> DataArray<T> {
         self.inner.iter_mut()
     }
 
-    pub fn get(&mut self, index: usize) -> Option<&T> {
+    pub fn get(&self, index: usize) -> Option<&T> {
         self.inner.get(index)
     }
 

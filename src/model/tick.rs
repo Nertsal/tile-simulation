@@ -73,7 +73,6 @@ impl Model {
                 // that attempted to move into the original tile
                 // (or a longer cycle has occured).
                 // The solution to this infinite recursion is to perform collisions.
-                // TODO: collisions
                 *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
                 return;
             }
@@ -126,10 +125,9 @@ impl Model {
                         // The target tile is occupied either by the target tile itself or by another tile
                         // that will replace the target tile.
                         // Hence, we need to perform collisions
-                        // TODO: collisions
-                        let tile = self.tiles.get_mut(tile_index).unwrap();
-                        tile.velocity = Vec2::ZERO;
-                        tile.tick_velocity = Vec2::ZERO;
+                        self.collide_tiles(tile_index, target_index);
+                        *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
+                        return;
                     }
                 }
                 ShiftedPosition::OutOfBounds => {
@@ -145,6 +143,76 @@ impl Model {
 
         // The tile either has no velocity or has been calculated to stay in place
         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
+    }
+
+    /// Calculates tile collision and changes their velocities and tick_velocities.
+    /// The tiles are not checked for adjacency, so collision checks should be done by the caller,
+    /// and the difference of their positions is not normalized (which may result in weird
+    /// behaviour if not accounted for by the caller).
+    fn collide_tiles(&mut self, tile_index: usize, other_index: usize) {
+        let tile = match self.tiles.get(tile_index) {
+            None => return,
+            Some(tile) => tile,
+        };
+        let other = match self.tiles.get(other_index) {
+            None => return,
+            Some(tile) => tile,
+        };
+
+        let tile_position = Position::from_index(tile_index, self.get_size().x);
+        let other_position = Position::from_index(other_index, self.get_size().x);
+
+        let edge_rotation = get_tile_edge_rotation(other_position);
+        let normal = (other_position.position.map(|x| Coord::new(x as f32))
+            - tile_position.position.map(|x| Coord::new(x as f32)))
+        .rotate(edge_rotation);
+
+        let relative_velocity = other.velocity - tile.velocity;
+        let relative_tick_velocity = other.tick_velocity - tile.tick_velocity;
+
+        let relative_projection = normal * Vec2::dot(relative_velocity, normal);
+        let relative_tick_projection = normal * Vec2::dot(relative_tick_velocity, normal);
+
+        // Check for static tiles
+        if other.is_static {
+            if tile.is_static {
+                return;
+            }
+            let tile_projection = normal * Vec2::dot(tile.velocity, normal);
+            let tile_tick_projection = normal * Vec2::dot(tile.tick_velocity, normal);
+            let bounciness = Coord::new(1.0 + 0.1);
+
+            // TODO: bounciness
+            let tile = self.tiles.get_mut(tile_index).unwrap();
+            tile.velocity -= tile_projection * bounciness;
+            tile.tick_velocity -= tile_tick_projection * bounciness;
+            return;
+        }
+        if tile.is_static {
+            if other.is_static {
+                return;
+            }
+            let other_projection = normal * Vec2::dot(other.velocity, normal);
+            let other_tick_projection = normal * Vec2::dot(other.tick_velocity, normal);
+            let bounciness = Coord::new(1.0 + 0.1);
+
+            // TODO: bounciness
+            let tile = self.tiles.get_mut(other_index).unwrap();
+            tile.velocity -= other_projection * bounciness;
+            tile.tick_velocity -= other_tick_projection * bounciness;
+            return;
+        }
+
+        // Both tiles are not static
+        let elasticity = Coord::new(0.5);
+        let relative_projection = relative_projection * elasticity;
+        let relative_tick_projection = relative_tick_projection * elasticity;
+        let tile = self.tiles.get_mut(tile_index).unwrap();
+        tile.velocity += relative_projection;
+        tile.tick_velocity += relative_tick_projection;
+        let other = self.tiles.get_mut(other_index).unwrap();
+        other.velocity -= relative_projection;
+        other.tick_velocity -= relative_tick_projection;
     }
 
     fn shift_position(&self, index: usize, direction: Vec2<isize>) -> ShiftedPosition {
@@ -207,4 +275,13 @@ enum ShiftedPosition {
     Valid(Position),
     /// The position is out of bounds of any known valid position.
     OutOfBounds,
+}
+
+/// Returns the rotation of the tile's edges. This is used to introduce a little bit
+/// of 'chaos' in the system when performing collisions.
+fn get_tile_edge_rotation(position: Position) -> R32 {
+    const EDGE_ROTATION: f32 = 0.05;
+
+    let mult = (position.position.x + position.position.y) % 2;
+    r32(mult as f32 * EDGE_ROTATION)
 }
