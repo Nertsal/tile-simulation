@@ -48,7 +48,7 @@ impl geng::State for Game {
         self.render.draw_ui(&self.selected_tile, framebuffer);
     }
 
-    fn update(&mut self, _delta_time: f64) {
+    fn update(&mut self, delta_time: f64) {
         if self
             .geng
             .window()
@@ -64,7 +64,9 @@ impl geng::State for Game {
                     self.framebuffer_size.map(|x| x as f32),
                     self.last_mouse_pos.map(|x| x as f32),
                 );
-                let velocity = (world_pos - last_mouse_pos).map(Coord::new);
+                let velocity =
+                    (world_pos - last_mouse_pos) / delta_time as f32 / 20.0 + vec2(0.0, -0.5);
+                let velocity = velocity.map(Coord::new);
                 self.model.set_tile(tile_pos, velocity, self.selected_tile);
             }
         }
