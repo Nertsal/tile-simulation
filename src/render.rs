@@ -18,9 +18,9 @@ impl Render {
         Self {
             geng: geng.clone(),
             camera: Camera2d {
-                center: vec2(5.0, 5.0),
+                center: vec2(15.0, 15.0),
                 rotation: 0.0,
-                fov: 60.0,
+                fov: 40.0,
             },
         }
     }
