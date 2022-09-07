@@ -30,7 +30,7 @@ impl Render {
         self.draw_grid(model, framebuffer);
     }
 
-    pub fn draw_ui(&self, selected_tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
+    pub fn draw_ui(&self, selected_tile: TileType, framebuffer: &mut ugli::Framebuffer) {
         let framebuffer_size = framebuffer.size().map(|x| x as f32);
         let screen = AABB::ZERO.extend_positive(framebuffer_size);
         let aabb = AABB::point(screen.bottom_left() + vec2(0.1, 0.1) * screen.size())
@@ -48,7 +48,7 @@ impl Render {
         for (position, tile) in model.get_tiles() {
             let position = position.position.map(|x| x as f32) * TILE_SIZE;
             let aabb = AABB::point(position).extend_positive(TILE_SIZE);
-            let color = tile_color(tile);
+            let color = tile_color(tile.tile_type);
             draw_2d::Quad::new(aabb, color).draw_2d(&self.geng, framebuffer, &self.camera);
         }
     }
@@ -79,9 +79,9 @@ impl Render {
     }
 }
 
-fn tile_color(tile: &Tile) -> Color<f32> {
+fn tile_color(tile: TileType) -> Color<f32> {
     match tile {
-        Tile::Empty => Color::TRANSPARENT_BLACK,
-        Tile::Sand => Color::YELLOW,
+        TileType::Empty => Color::TRANSPARENT_BLACK,
+        TileType::Sand => Color::YELLOW,
     }
 }

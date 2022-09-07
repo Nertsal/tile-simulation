@@ -7,23 +7,20 @@ impl Model {
     }
 
     fn apply_gravity(&mut self) {
-        for (tile, velocity) in self.tiles.iter().zip(self.velocities.iter_mut()) {
-            let gravity_scale = match tile {
-                Tile::Empty => 0.0,
-                Tile::Sand => 1.0,
+        for tile in self.tiles.iter_mut() {
+            let gravity_scale = match tile.tile_type {
+                TileType::Empty => 0.0,
+                TileType::Sand => 1.0,
             };
             let gravity = (GRAVITY * gravity_scale).map(Coord::new);
-            *velocity += gravity;
+            tile.velocity += gravity;
         }
     }
 
     fn move_tiles(&mut self) {
         // Update tick velocities
-        for (index, velocity) in self.velocities.iter().enumerate() {
-            *self
-                .tick_velocities
-                .get_mut(index)
-                .expect("`tick_velocities` or `velocities` is invalid") += *velocity;
+        for tile in self.tiles.iter_mut() {
+            tile.tick_velocity += tile.velocity;
         }
 
         // Repeatedly calculate tiles while updates are queued
@@ -31,7 +28,7 @@ impl Model {
             .tiles
             .iter()
             .enumerate()
-            .filter(|(_, tile)| !matches!(tile, Tile::Empty))
+            .filter(|(_, tile)| !matches!(tile.tile_type, TileType::Empty))
             .map(|(i, _)| i)
             .collect();
         while !update_queue.is_empty() {
@@ -55,20 +52,13 @@ impl Model {
     }
 
     fn perform_movement(&mut self, moves_to: DataArray<Option<usize>>) {
-        let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::Empty);
-        let mut new_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
-        let mut new_tick_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
+        let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::empty());
         for (from, to) in moves_to.into_iter().enumerate() {
             if let Some(to) = to {
                 *new_tiles.get_mut(to).unwrap() = *self.tiles.get(from).unwrap();
-                *new_velocities.get_mut(to).unwrap() = *self.velocities.get(from).unwrap();
-                *new_tick_velocities.get_mut(to).unwrap() =
-                    *self.tick_velocities.get(from).unwrap();
             }
         }
         self.tiles = new_tiles;
-        self.velocities = new_velocities;
-        self.tick_velocities = new_tick_velocities;
     }
 
     fn calculate_tile_move(&mut self, tile_index: usize, calculation: &mut Calculation) {
@@ -90,7 +80,7 @@ impl Model {
         }
 
         // Check if the tile is an Empty tile
-        if let Tile::Empty = self.tiles.get(tile_index).unwrap() {
+        if let TileType::Empty = self.tiles.get(tile_index).unwrap().tile_type {
             *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
             *calculation.moves_to.get_mut(tile_index).unwrap() = None;
             return;
@@ -100,7 +90,7 @@ impl Model {
         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Processing;
 
         // Get the movement direction based on the tile's velocity
-        let direction = velocity_direction(*self.tick_velocities.get(tile_index).unwrap());
+        let direction = velocity_direction(self.tiles.get(tile_index).unwrap().tick_velocity);
         if direction != Vec2::ZERO {
             // Try moving tile in the direction
             match self.shift_position(tile_index, direction) {
@@ -117,7 +107,7 @@ impl Model {
                         *state = TileMoveInfo::Replaced;
                         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
                         *calculation.moves_to.get_mut(tile_index).unwrap() = Some(target_index);
-                        *self.tick_velocities.get_mut(tile_index).unwrap() -=
+                        self.tiles.get_mut(tile_index).unwrap().tick_velocity -=
                             direction.map(|x| Coord::new(x as f32));
 
                         // Queue update for the moved tile
@@ -128,17 +118,18 @@ impl Model {
                         // that will replace the target tile.
                         // Hence, we need to perform collisions
                         // TODO: collisions
-                        *self.velocities.get_mut(tile_index).unwrap() = Vec2::ZERO;
-                        *self.tick_velocities.get_mut(tile_index).unwrap() = Vec2::ZERO;
+                        let tile = self.tiles.get_mut(tile_index).unwrap();
+                        tile.velocity = Vec2::ZERO;
+                        tile.tick_velocity = Vec2::ZERO;
                     }
                 }
                 ShiftedPosition::OutOfBounds => {
                     // The tile wants to move out of bounds, but that is impossible.
                     // We need to subtract velocity of the tile in that out of bounds direction.
-                    let velocity = self.velocities.get_mut(tile_index).unwrap();
-                    *velocity -= *velocity * direction.map(|x| Coord::new(x.abs() as f32));
-                    let velocity = self.tick_velocities.get_mut(tile_index).unwrap();
-                    *velocity -= *velocity * direction.map(|x| Coord::new(x.abs() as f32));
+                    let tile = self.tiles.get_mut(tile_index).unwrap();
+                    tile.velocity -= tile.velocity * direction.map(|x| Coord::new(x.abs() as f32));
+                    tile.tick_velocity -=
+                        tile.tick_velocity * direction.map(|x| Coord::new(x.abs() as f32));
                 }
             }
         }
