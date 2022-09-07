@@ -46,7 +46,7 @@ impl Model {
         let mut calculation = Calculation {
             next_updates: Vec::new(),
             state: DataArray::new(self.get_tiles_count(), TileMoveInfo::Queued),
-            moves_to: DataArray::from((0..self.get_tiles_count()).collect::<Vec<_>>()),
+            moves_to: DataArray::from((0..self.get_tiles_count()).map(Some).collect::<Vec<_>>()),
         };
         while let Some(index) = update_queue.pop() {
             self.calculate_tile_move(index, &mut calculation);
@@ -54,14 +54,17 @@ impl Model {
         calculation
     }
 
-    fn perform_movement(&mut self, moves_to: DataArray<usize>) {
+    fn perform_movement(&mut self, moves_to: DataArray<Option<usize>>) {
         let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::Empty);
         let mut new_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
         let mut new_tick_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
         for (from, to) in moves_to.into_iter().enumerate() {
-            *new_tiles.get_mut(to).unwrap() = *self.tiles.get(from).unwrap();
-            *new_velocities.get_mut(to).unwrap() = *self.velocities.get(from).unwrap();
-            *new_tick_velocities.get_mut(to).unwrap() = *self.tick_velocities.get(from).unwrap();
+            if let Some(to) = to {
+                *new_tiles.get_mut(to).unwrap() = *self.tiles.get(from).unwrap();
+                *new_velocities.get_mut(to).unwrap() = *self.velocities.get(from).unwrap();
+                *new_tick_velocities.get_mut(to).unwrap() =
+                    *self.tick_velocities.get(from).unwrap();
+            }
         }
         self.tiles = new_tiles;
         self.velocities = new_velocities;
@@ -89,6 +92,7 @@ impl Model {
         // Check if the tile is an Empty tile
         if let Tile::Empty = self.tiles.get(tile_index).unwrap() {
             *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
+            *calculation.moves_to.get_mut(tile_index).unwrap() = None;
             return;
         }
 
@@ -112,7 +116,7 @@ impl Model {
                         // The target tile will move and can be replaced by the current tile
                         *state = TileMoveInfo::Replaced;
                         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
-                        *calculation.moves_to.get_mut(tile_index).unwrap() = target_index;
+                        *calculation.moves_to.get_mut(tile_index).unwrap() = Some(target_index);
                         *self.tick_velocities.get_mut(tile_index).unwrap() -=
                             direction.map(|x| Coord::new(x as f32));
 
@@ -184,7 +188,7 @@ struct Calculation {
     /// Results of tile movement calculations.
     state: DataArray<TileMoveInfo>,
     /// The calculated tile moves.
-    moves_to: DataArray<usize>,
+    moves_to: DataArray<Option<usize>>,
 }
 
 /// Transforms normal velocity into a single tile long direction (one of 5 options).
