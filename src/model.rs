@@ -8,7 +8,7 @@ use data_array::*;
 pub use position::*;
 
 const WIDTH: usize = 30;
-const GRAVITY: Vec2<f32> = vec2(0.0, -0.5);
+const GRAVITY: Vec2<f32> = vec2(0.0, -0.1);
 
 pub type Coord = R32;
 

@@ -31,11 +31,11 @@ impl Model {
         self.perform_movement(movement);
     }
 
-    fn calculate_movement(&mut self) -> DataArray<usize> {
+    fn calculate_movement(&mut self) -> DataArray<Tile> {
         let mut calculation = Calculation {
             queued: (0..self.get_tiles_count()).collect(),
             state: DataArray::new(self.get_tiles_count(), TileMoveInfo::Queued),
-            moves: DataArray::from((0..self.get_tiles_count()).collect::<Vec<usize>>()),
+            moves: self.tiles.clone(),
         };
         while let Some(index) = calculation.queued.pop() {
             self.calculate_tile_move(index, &mut calculation);
@@ -43,22 +43,26 @@ impl Model {
         calculation.moves
     }
 
-    fn perform_movement(&mut self, moves: DataArray<usize>) {
-        let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::Empty);
-        for (old_index, new_index) in moves.into_iter().enumerate() {
-            *new_tiles.get_mut(new_index).expect("Invalid new index") =
-                *self.tiles.get(old_index).expect("Invalid old index");
-        }
-        self.tiles = new_tiles;
+    fn perform_movement(&mut self, moves: DataArray<Tile>) {
+        self.tiles = moves;
     }
 
     fn calculate_tile_move(&mut self, tile_index: usize, calculation: &mut Calculation) {
         // Check if the tile has already been calculated
-        if !matches!(
-            calculation.state.get(tile_index).unwrap(),
-            TileMoveInfo::Queued
-        ) {
-            return;
+        match calculation.state.get(tile_index).unwrap() {
+            TileMoveInfo::Queued => {}
+            TileMoveInfo::Processing => {
+                // This tile has already been started to be calculated.
+                // The fact that the calculation has returned to that tile,
+                // indicates that the tile tried to move into another tile
+                // that attempted to move into the original tile
+                // (or a longer cycle has occured).
+                // The solution to this infinite recursion is to perform collisions.
+                // TODO: collisions
+                *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
+                return;
+            }
+            _ => return,
         }
 
         // Check if the tile is an Empty tile
@@ -66,6 +70,9 @@ impl Model {
             *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
             return;
         }
+
+        // Indicate that the tile's processing has begun
+        *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Processing;
 
         // Get the movement direction based on the tile's velocity
         let direction = velocity_direction(*self.velocities.get(tile_index).unwrap());
@@ -76,6 +83,7 @@ impl Model {
                     // The target position in valid, so we need to check for collisions.
                     let target_index = position.to_index(self.get_size().x);
                     // Calculate the target's move
+                    // TODO: check for infinite recursions
                     self.calculate_tile_move(target_index, calculation);
                     // Check if target tile's move is Freed
                     let state = calculation.state.get_mut(target_index).unwrap();
@@ -83,14 +91,17 @@ impl Model {
                         // The target tile will move and can be replaced by the current tile
                         *state = TileMoveInfo::Replaced;
                         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
-                        *calculation.moves.get_mut(tile_index).unwrap() = target_index;
+                        *calculation.moves.get_mut(tile_index).unwrap() = Tile::Empty;
+                        *calculation.moves.get_mut(target_index).unwrap() =
+                            *self.tiles.get(tile_index).unwrap();
                         *self.tick_velocities.get_mut(tile_index).unwrap() -=
                             direction.map(|x| Coord::new(x as f32));
                         return;
                     } else {
                         // The target tile is occupied either by the target tile itself or by another tile
                         // that will replace the target tile.
-                        // Hence, we need to perform collisions TODO
+                        // Hence, we need to perform collisions
+                        // TODO: collisions
                         *self.velocities.get_mut(tile_index).unwrap() = Vec2::ZERO;
                         *self.tick_velocities.get_mut(tile_index).unwrap() = Vec2::ZERO;
                     }
@@ -134,6 +145,8 @@ impl Model {
 enum TileMoveInfo {
     /// The tile has not yet been calculated.
     Queued,
+    /// The tile's calculation has been initiated, but not yet completed.
+    Processing,
     /// The tile will stay in place.
     Static,
     /// The tile will move and its place will be free after the move.
@@ -149,7 +162,7 @@ struct Calculation {
     /// Results of tile movement calculations.
     state: DataArray<TileMoveInfo>,
     /// The calculated tile moves.
-    moves: DataArray<usize>,
+    moves: DataArray<Tile>,
 }
 
 /// Transforms normal velocity into a single tile long direction (one of 5 options).
