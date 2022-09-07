@@ -65,7 +65,7 @@ impl geng::State for Game {
                     self.last_mouse_pos.map(|x| x as f32),
                 );
                 let velocity =
-                    (world_pos - last_mouse_pos) / delta_time as f32 / 20.0 + vec2(0.0, -0.5);
+                    (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -0.5);
                 let velocity = velocity.map(Coord::new);
                 self.model.set_tile(tile_pos, velocity, self.selected_tile);
             }
