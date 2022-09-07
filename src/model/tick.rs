@@ -26,25 +26,46 @@ impl Model {
                 .expect("`tick_velocities` or `velocities` is invalid") += *velocity;
         }
 
-        // Calculate and perform movement
-        let movement = self.calculate_movement();
-        self.perform_movement(movement);
+        // Repeatedly calculate tiles while updates are queued
+        let mut update_queue: Vec<usize> = self
+            .tiles
+            .iter()
+            .enumerate()
+            .filter(|(_, tile)| !matches!(tile, Tile::Empty))
+            .map(|(i, _)| i)
+            .collect();
+        while !update_queue.is_empty() {
+            // Calculate and perform movement
+            let calculation = self.calculate_movement(&mut update_queue);
+            self.perform_movement(calculation.moves_to);
+            update_queue.extend(calculation.next_updates);
+        }
     }
 
-    fn calculate_movement(&mut self) -> DataArray<Tile> {
+    fn calculate_movement(&mut self, update_queue: &mut Vec<usize>) -> Calculation {
         let mut calculation = Calculation {
-            queued: (0..self.get_tiles_count()).collect(),
+            next_updates: Vec::new(),
             state: DataArray::new(self.get_tiles_count(), TileMoveInfo::Queued),
-            moves: self.tiles.clone(),
+            moves_to: DataArray::from((0..self.get_tiles_count()).collect::<Vec<_>>()),
         };
-        while let Some(index) = calculation.queued.pop() {
+        while let Some(index) = update_queue.pop() {
             self.calculate_tile_move(index, &mut calculation);
         }
-        calculation.moves
+        calculation
     }
 
-    fn perform_movement(&mut self, moves: DataArray<Tile>) {
-        self.tiles = moves;
+    fn perform_movement(&mut self, moves_to: DataArray<usize>) {
+        let mut new_tiles = DataArray::new(self.get_tiles_count(), Tile::Empty);
+        let mut new_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
+        let mut new_tick_velocities = DataArray::new(self.get_tiles_count(), Vec2::ZERO);
+        for (from, to) in moves_to.into_iter().enumerate() {
+            *new_tiles.get_mut(to).unwrap() = *self.tiles.get(from).unwrap();
+            *new_velocities.get_mut(to).unwrap() = *self.velocities.get(from).unwrap();
+            *new_tick_velocities.get_mut(to).unwrap() = *self.tick_velocities.get(from).unwrap();
+        }
+        self.tiles = new_tiles;
+        self.velocities = new_velocities;
+        self.tick_velocities = new_tick_velocities;
     }
 
     fn calculate_tile_move(&mut self, tile_index: usize, calculation: &mut Calculation) {
@@ -53,7 +74,7 @@ impl Model {
             TileMoveInfo::Queued => {}
             TileMoveInfo::Processing => {
                 // This tile has already been started to be calculated.
-                // The fact that the calculation has returned to that tile,
+                // The fact that the calculation has returned to that tile
                 // indicates that the tile tried to move into another tile
                 // that attempted to move into the original tile
                 // (or a longer cycle has occured).
@@ -75,7 +96,7 @@ impl Model {
         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Processing;
 
         // Get the movement direction based on the tile's velocity
-        let direction = velocity_direction(*self.velocities.get(tile_index).unwrap());
+        let direction = velocity_direction(*self.tick_velocities.get(tile_index).unwrap());
         if direction != Vec2::ZERO {
             // Try moving tile in the direction
             match self.shift_position(tile_index, direction) {
@@ -91,11 +112,12 @@ impl Model {
                         // The target tile will move and can be replaced by the current tile
                         *state = TileMoveInfo::Replaced;
                         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
-                        *calculation.moves.get_mut(tile_index).unwrap() = Tile::Empty;
-                        *calculation.moves.get_mut(target_index).unwrap() =
-                            *self.tiles.get(tile_index).unwrap();
+                        *calculation.moves_to.get_mut(tile_index).unwrap() = target_index;
                         *self.tick_velocities.get_mut(tile_index).unwrap() -=
                             direction.map(|x| Coord::new(x as f32));
+
+                        // Queue update for the moved tile
+                        calculation.next_updates.push(target_index);
                         return;
                     } else {
                         // The target tile is occupied either by the target tile itself or by another tile
@@ -158,11 +180,11 @@ enum TileMoveInfo {
 /// A temporary structure to hold intermidate calculation information.
 struct Calculation {
     /// Queued tile updates.
-    queued: Vec<usize>,
+    next_updates: Vec<usize>,
     /// Results of tile movement calculations.
     state: DataArray<TileMoveInfo>,
     /// The calculated tile moves.
-    moves: DataArray<Tile>,
+    moves_to: DataArray<usize>,
 }
 
 /// Transforms normal velocity into a single tile long direction (one of 5 options).
