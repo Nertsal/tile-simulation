@@ -10,6 +10,7 @@ impl Model {
         for tile in self.tiles.iter_mut() {
             let gravity_scale = match tile.tile_type {
                 TileType::Empty => 0.0,
+                TileType::Barrier => 0.0,
                 TileType::Sand => 1.0,
             };
             let gravity = (GRAVITY * gravity_scale).map(Coord::new);
@@ -79,10 +80,18 @@ impl Model {
             _ => return,
         }
 
+        let tile = self.tiles.get(tile_index).unwrap();
+
         // Check if the tile is an Empty tile
-        if let TileType::Empty = self.tiles.get(tile_index).unwrap().tile_type {
+        if let TileType::Empty = tile.tile_type {
             *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Freed;
             *calculation.moves_to.get_mut(tile_index).unwrap() = None;
+            return;
+        }
+
+        // Check if the tile is static
+        if tile.is_static {
+            *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
             return;
         }
 

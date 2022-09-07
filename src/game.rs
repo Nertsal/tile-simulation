@@ -8,7 +8,7 @@ pub struct Game {
     model: Model,
     render: Render,
     framebuffer_size: Vec2<usize>,
-    selected_tile: TileType,
+    selected_tile: Tile,
     last_mouse_pos: Vec2<f64>,
 }
 
@@ -19,7 +19,7 @@ impl Game {
             model: Model::new(),
             render: Render::new(geng),
             framebuffer_size: vec2(1, 1),
-            selected_tile: TileType::Empty,
+            selected_tile: Tile::empty(),
             last_mouse_pos: Vec2::ZERO,
         }
     }
@@ -45,7 +45,8 @@ impl geng::State for Game {
         self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Color::BLACK), None);
         self.render.draw_model(&self.model, framebuffer);
-        self.render.draw_ui(self.selected_tile, framebuffer);
+        self.render
+            .draw_ui(self.selected_tile.tile_type, framebuffer);
     }
 
     fn update(&mut self, delta_time: f64) {
@@ -65,9 +66,9 @@ impl geng::State for Game {
                     self.last_mouse_pos.map(|x| x as f32),
                 );
                 let velocity =
-                    (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -0.5);
+                    (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -1.0);
                 let velocity = velocity.map(Coord::new);
-                let mut tile = Tile::new(self.selected_tile);
+                let mut tile = self.selected_tile;
                 tile.velocity = velocity;
                 self.model.set_tile(tile_pos, tile);
             }
@@ -83,8 +84,9 @@ impl geng::State for Game {
     fn handle_event(&mut self, event: geng::Event) {
         if let geng::Event::KeyDown { key } = event {
             match key {
-                geng::Key::Num0 => self.selected_tile = TileType::Empty,
-                geng::Key::Num1 => self.selected_tile = TileType::Sand,
+                geng::Key::Num0 => self.selected_tile = Tile::empty(),
+                geng::Key::Num1 => self.selected_tile = Tile::new_static(TileType::Barrier),
+                geng::Key::Num2 => self.selected_tile = Tile::new(TileType::Sand),
                 _ => {}
             }
         }

@@ -82,6 +82,7 @@ impl Render {
 fn tile_color(tile: TileType) -> Color<f32> {
     match tile {
         TileType::Empty => Color::TRANSPARENT_BLACK,
+        TileType::Barrier => Color::WHITE,
         TileType::Sand => Color::YELLOW,
     }
 }
