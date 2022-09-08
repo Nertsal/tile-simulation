@@ -10,6 +10,7 @@ pub struct Game {
     framebuffer_size: Vec2<usize>,
     selected_tile: Tile,
     last_mouse_pos: Vec2<f64>,
+    draw_velocities: bool,
 }
 
 impl Game {
@@ -21,6 +22,7 @@ impl Game {
             framebuffer_size: vec2(1, 1),
             selected_tile: Tile::empty(),
             last_mouse_pos: Vec2::ZERO,
+            draw_velocities: false,
         }
     }
 
@@ -44,7 +46,8 @@ impl geng::State for Game {
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Color::BLACK), None);
-        self.render.draw_model(&self.model, framebuffer);
+        self.render
+            .draw_model(&self.model, self.draw_velocities, framebuffer);
         self.render
             .draw_ui(self.selected_tile.tile_type, framebuffer);
     }
@@ -87,6 +90,7 @@ impl geng::State for Game {
                 geng::Key::Num0 => self.selected_tile = Tile::empty(),
                 geng::Key::Num1 => self.selected_tile = Tile::new_static(TileType::Barrier),
                 geng::Key::Num2 => self.selected_tile = Tile::new(TileType::Sand),
+                geng::Key::F1 => self.draw_velocities = !self.draw_velocities,
                 _ => {}
             }
         }

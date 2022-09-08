@@ -25,9 +25,17 @@ impl Render {
         }
     }
 
-    pub fn draw_model(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
-        self.draw_tiles(model, framebuffer);
+    pub fn draw_model(
+        &self,
+        model: &Model,
+        draw_velocities: bool,
+        framebuffer: &mut ugli::Framebuffer,
+    ) {
         self.draw_grid(model, framebuffer);
+        self.draw_tiles(model, framebuffer);
+        if draw_velocities {
+            self.draw_velocities(model, framebuffer);
+        }
     }
 
     pub fn draw_ui(&self, selected_tile: TileType, framebuffer: &mut ugli::Framebuffer) {
@@ -50,6 +58,35 @@ impl Render {
             let aabb = AABB::point(position).extend_positive(TILE_SIZE);
             let color = tile_color(tile.tile_type);
             draw_2d::Quad::new(aabb, color).draw_2d(&self.geng, framebuffer, &self.camera);
+        }
+    }
+
+    fn draw_velocities(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+        for (position, tile) in model.get_tiles() {
+            let len = tile.velocity.len();
+            if len < Coord::new(0.1) {
+                continue;
+            }
+            let position = position.position.map(|x| x as f32 + 0.5) * TILE_SIZE;
+            const ARROW_WIDTH: f32 = 0.1;
+            const ARROW_HEAD_SIZE: f32 = 0.1;
+            let vertices = vec![
+                vec2(0.0, ARROW_WIDTH / 2.0),
+                vec2(0.0, -ARROW_WIDTH / 2.0),
+                vec2(len.as_f32(), -ARROW_WIDTH / 2.0),
+                vec2(len.as_f32(), -ARROW_WIDTH / 2.0 - ARROW_HEAD_SIZE / 2.0),
+                vec2(len.as_f32() + ARROW_HEAD_SIZE / 2.0, 0.0),
+                vec2(len.as_f32(), ARROW_WIDTH / 2.0 + ARROW_HEAD_SIZE / 2.0),
+                vec2(len.as_f32(), ARROW_WIDTH / 2.0),
+                vec2(0.0, ARROW_WIDTH / 2.0),
+            ];
+            let transform = Mat3::translate(position) * Mat3::rotate(tile.velocity.arg().as_f32());
+            draw_2d::Polygon::new(vertices, Color::BLUE).draw_2d_transformed(
+                &self.geng,
+                framebuffer,
+                &self.camera,
+                transform,
+            );
         }
     }
 
