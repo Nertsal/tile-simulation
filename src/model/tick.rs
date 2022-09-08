@@ -207,15 +207,15 @@ impl Model {
 
         // Both tiles are not static
         let elasticity = Coord::new(1.0);
-        let energy_loss = Coord::new(0.0);
+        let energy_loss = Coord::new(1.0 - 0.1);
         let relative_projection = relative_projection * elasticity;
         let relative_tick_projection = relative_tick_projection * elasticity;
         let tile = self.tiles.get_mut(tile_index).unwrap();
-        tile.velocity += relative_projection - tile_projection * energy_loss;
-        tile.tick_velocity += relative_tick_projection - tile_tick_projection * energy_loss;
+        tile.velocity = (tile.velocity + relative_projection) * energy_loss;
+        tile.tick_velocity = (tile.tick_velocity + relative_tick_projection) * energy_loss;
         let other = self.tiles.get_mut(other_index).unwrap();
-        other.velocity += -relative_projection - other_projection * energy_loss;
-        other.tick_velocity += -relative_tick_projection - other_tick_projection * energy_loss;
+        other.velocity = (other.velocity - relative_projection) * energy_loss;
+        other.tick_velocity = (other.tick_velocity - relative_tick_projection) * energy_loss;
     }
 
     fn shift_position(&self, index: usize, direction: Vec2<isize>) -> ShiftedPosition {
