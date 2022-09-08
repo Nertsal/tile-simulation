@@ -106,7 +106,6 @@ impl Model {
                     // The target position in valid, so we need to check for collisions.
                     let target_index = position.to_index(self.get_size().x);
                     // Calculate the target's move
-                    // TODO: check for infinite recursions
                     self.calculate_tile_move(target_index, calculation);
                     // Check if target tile's move is Freed
                     let state = calculation.state.get_mut(target_index).unwrap();
@@ -162,7 +161,6 @@ impl Model {
             .position
             .map(|x| x as isize)
             + direction;
-        // TODO: properly check bounds
         if position.iter().any(|x| *x < 0)
             || position.x >= self.get_size().x as isize
             || position.y >= self.get_size().y as isize
