@@ -57,6 +57,9 @@ impl Render {
     }
 
     fn draw_tile_info(&self, tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
+        if let TileType::Empty = tile.tile_type {
+            return;
+        }
         let framebuffer_size = framebuffer.size().map(|x| x as f32);
         let screen = AABB::ZERO.extend_positive(framebuffer_size);
         let pos = vec2(screen.center().x, screen.y_max) + vec2(0.0, -0.1) * screen.height();

@@ -133,10 +133,14 @@ impl Model {
                 ShiftedPosition::OutOfBounds => {
                     // The tile wants to move out of bounds, but that is impossible.
                     // We need to subtract velocity of the tile in that out of bounds direction.
+                    let position = Position::from_index(tile_index, self.get_size().x);
+                    let edge_rotation = get_tile_edge_rotation(position);
                     let tile = self.tiles.get_mut(tile_index).unwrap();
-                    tile.velocity -= tile.velocity * direction.map(|x| Coord::new(x.abs() as f32));
-                    tile.tick_velocity -=
-                        tile.tick_velocity * direction.map(|x| Coord::new(x.abs() as f32));
+                    let direction = direction
+                        .map(|x| Coord::new(x as f32))
+                        .rotate(edge_rotation);
+                    tile.velocity -= direction * Vec2::dot(tile.velocity, direction);
+                    tile.tick_velocity -= direction * Vec2::dot(tile.tick_velocity, direction);
                 }
             }
         }
@@ -167,6 +171,12 @@ impl Model {
             - tile_position.position.map(|x| Coord::new(x as f32)))
         .rotate(edge_rotation);
 
+        let tile_projection = normal * Vec2::dot(tile.velocity, normal);
+        let tile_tick_projection = normal * Vec2::dot(tile.tick_velocity, normal);
+
+        let other_projection = normal * Vec2::dot(other.velocity, normal);
+        let other_tick_projection = normal * Vec2::dot(other.tick_velocity, normal);
+
         let relative_velocity = other.velocity - tile.velocity;
         let relative_tick_velocity = other.tick_velocity - tile.tick_velocity;
 
@@ -178,11 +188,7 @@ impl Model {
             if tile.is_static {
                 return;
             }
-            let tile_projection = normal * Vec2::dot(tile.velocity, normal);
-            let tile_tick_projection = normal * Vec2::dot(tile.tick_velocity, normal);
             let bounciness = Coord::new(1.0 + 0.1);
-
-            // TODO: bounciness
             let tile = self.tiles.get_mut(tile_index).unwrap();
             tile.velocity -= tile_projection * bounciness;
             tile.tick_velocity -= tile_tick_projection * bounciness;
@@ -192,11 +198,7 @@ impl Model {
             if other.is_static {
                 return;
             }
-            let other_projection = normal * Vec2::dot(other.velocity, normal);
-            let other_tick_projection = normal * Vec2::dot(other.tick_velocity, normal);
             let bounciness = Coord::new(1.0 + 0.1);
-
-            // TODO: bounciness
             let tile = self.tiles.get_mut(other_index).unwrap();
             tile.velocity -= other_projection * bounciness;
             tile.tick_velocity -= other_tick_projection * bounciness;
@@ -204,15 +206,16 @@ impl Model {
         }
 
         // Both tiles are not static
-        let elasticity = Coord::new(0.5);
+        let elasticity = Coord::new(1.0);
+        let energy_loss = Coord::new(0.0);
         let relative_projection = relative_projection * elasticity;
         let relative_tick_projection = relative_tick_projection * elasticity;
         let tile = self.tiles.get_mut(tile_index).unwrap();
-        tile.velocity += relative_projection;
-        tile.tick_velocity += relative_tick_projection;
+        tile.velocity += relative_projection - tile_projection * energy_loss;
+        tile.tick_velocity += relative_tick_projection - tile_tick_projection * energy_loss;
         let other = self.tiles.get_mut(other_index).unwrap();
-        other.velocity -= relative_projection;
-        other.tick_velocity -= relative_tick_projection;
+        other.velocity += -relative_projection - other_projection * energy_loss;
+        other.tick_velocity += -relative_tick_projection - other_tick_projection * energy_loss;
     }
 
     fn shift_position(&self, index: usize, direction: Vec2<isize>) -> ShiftedPosition {
@@ -261,10 +264,10 @@ struct Calculation {
 
 /// Transforms normal velocity into a single tile long direction (one of 5 options).
 fn velocity_direction(velocity: Vec2<Coord>) -> Vec2<isize> {
-    let vel = velocity.map(|x| (x.as_f32() as isize).signum());
+    let vel = velocity.map(|x| x.as_f32() as isize);
     match vel.x.abs().cmp(&vel.y.abs()) {
-        std::cmp::Ordering::Less => vec2(0, vel.y),
-        _ => vec2(vel.x, 0),
+        std::cmp::Ordering::Less => vec2(0, vel.y.signum()),
+        _ => vec2(vel.x.signum(), 0),
     }
 }
 
@@ -282,6 +285,6 @@ enum ShiftedPosition {
 fn get_tile_edge_rotation(position: Position) -> R32 {
     const EDGE_ROTATION: f32 = 0.05;
 
-    let mult = (position.position.x + position.position.y) % 2;
-    r32(mult as f32 * EDGE_ROTATION)
+    let mult = ((position.position.x + position.position.y) % 2) as f32 * 2.0 - 1.0;
+    r32(mult * EDGE_ROTATION)
 }
