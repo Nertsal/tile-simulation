@@ -38,7 +38,41 @@ impl Render {
         }
     }
 
-    pub fn draw_ui(&self, selected_tile: TileType, framebuffer: &mut ugli::Framebuffer) {
+    pub fn draw_ui(
+        &self,
+        model: &Model,
+        selected_tile: TileType,
+        framebuffer: &mut ugli::Framebuffer,
+    ) {
+        self.draw_selected_tile(selected_tile, framebuffer);
+        let world_pos = self.camera.screen_to_world(
+            framebuffer.size().map(|x| x as f32),
+            self.geng.window().mouse_pos().map(|x| x as f32),
+        );
+        if let Some(tile_pos) = game::tile_pos(model, world_pos) {
+            if let Some(tile) = model.get_tile(tile_pos) {
+                self.draw_tile_info(tile, framebuffer);
+            }
+        }
+    }
+
+    fn draw_tile_info(&self, tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
+        let framebuffer_size = framebuffer.size().map(|x| x as f32);
+        let screen = AABB::ZERO.extend_positive(framebuffer_size);
+        let pos = vec2(screen.center().x, screen.y_max) + vec2(0.0, -0.1) * screen.height();
+        let font = &**self.geng.default_font();
+        let font_size = 0.05 * screen.height();
+        let text = format!(
+            "{:?}: ({:.1}, {:.1})",
+            tile.tile_type, tile.velocity.x, tile.velocity.y
+        );
+        draw_2d::Text::unit(font, text, Color::WHITE)
+            .scale_uniform(font_size)
+            .translate(pos)
+            .draw_2d(&self.geng, framebuffer, &geng::PixelPerfectCamera);
+    }
+
+    fn draw_selected_tile(&self, selected_tile: TileType, framebuffer: &mut ugli::Framebuffer) {
         let framebuffer_size = framebuffer.size().map(|x| x as f32);
         let screen = AABB::ZERO.extend_positive(framebuffer_size);
         let aabb = AABB::point(screen.bottom_left() + vec2(0.1, 0.1) * screen.size())

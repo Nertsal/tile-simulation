@@ -26,6 +26,10 @@ impl Model {
         }
     }
 
+    pub fn get_tile(&self, position: Position) -> Option<&Tile> {
+        self.tiles.get(position.to_index(self.get_size().x))
+    }
+
     pub fn get_size(&self) -> Vec2<usize> {
         vec2(WIDTH, WIDTH)
     }

@@ -25,21 +25,6 @@ impl Game {
             draw_velocities: false,
         }
     }
-
-    fn tile_pos(&self, world_pos: Vec2<f32>) -> Option<Position> {
-        let tile_pos = (world_pos / crate::render::TILE_SIZE).map(|x| x.floor() as i64);
-        let size = self.model.get_size();
-        if tile_pos.iter().any(|x| *x < 0)
-            || tile_pos.x >= size.x as i64
-            || tile_pos.y >= size.y as i64
-        {
-            None
-        } else {
-            Some(Position {
-                position: tile_pos.map(|x| x as usize),
-            })
-        }
-    }
 }
 
 impl geng::State for Game {
@@ -49,7 +34,7 @@ impl geng::State for Game {
         self.render
             .draw_model(&self.model, self.draw_velocities, framebuffer);
         self.render
-            .draw_ui(self.selected_tile.tile_type, framebuffer);
+            .draw_ui(&self.model, self.selected_tile.tile_type, framebuffer);
     }
 
     fn update(&mut self, delta_time: f64) {
@@ -63,7 +48,7 @@ impl geng::State for Game {
                 self.framebuffer_size.map(|x| x as f32),
                 position.map(|x| x as f32),
             );
-            if let Some(tile_pos) = self.tile_pos(world_pos) {
+            if let Some(tile_pos) = tile_pos(&self.model, world_pos) {
                 let last_mouse_pos = self.render.camera.screen_to_world(
                     self.framebuffer_size.map(|x| x as f32),
                     self.last_mouse_pos.map(|x| x as f32),
@@ -94,5 +79,18 @@ impl geng::State for Game {
                 _ => {}
             }
         }
+    }
+}
+
+pub fn tile_pos(model: &Model, world_pos: Vec2<f32>) -> Option<Position> {
+    let tile_pos = (world_pos / crate::render::TILE_SIZE).map(|x| x.floor() as i64);
+    let size = model.get_size();
+    if tile_pos.iter().any(|x| *x < 0) || tile_pos.x >= size.x as i64 || tile_pos.y >= size.y as i64
+    {
+        None
+    } else {
+        Some(Position {
+            position: tile_pos.map(|x| x as usize),
+        })
     }
 }
