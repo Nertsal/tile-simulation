@@ -63,6 +63,9 @@ impl Render {
 
     fn draw_velocities(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
         for (position, tile) in model.get_tiles() {
+            if let TileType::Empty = tile.tile_type {
+                continue;
+            }
             let len = tile.velocity.len();
             if len < Coord::new(0.1) {
                 continue;
