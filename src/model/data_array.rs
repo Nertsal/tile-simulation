@@ -28,6 +28,23 @@ impl<T> DataArray<T> {
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         self.inner.get_mut(index)
     }
+
+    /// Attempts to get mutable access to two elemets.
+    /// Returns `None` if any of the elemets is not present of if the indices are equal.
+    pub fn get_two_mut(&mut self, index: usize, other: usize) -> Option<(&mut T, &mut T)> {
+        let (lower, higher) = match index.cmp(&other) {
+            std::cmp::Ordering::Less => (index, other),
+            std::cmp::Ordering::Equal => return None,
+            std::cmp::Ordering::Greater => (other, index),
+        };
+        if higher >= self.inner.len() {
+            return None;
+        }
+        let (left, right) = self.inner.as_mut_slice().split_at_mut(higher);
+        let lower = &mut left[lower];
+        let higher = right.first_mut().unwrap();
+        Some((lower, higher))
+    }
 }
 
 impl<T> IntoIterator for DataArray<T> {
