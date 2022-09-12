@@ -57,7 +57,7 @@ impl Render {
     }
 
     fn draw_tile_info(&self, tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
-        if let TileType::Empty = tile.tile_type {
+        if matches!(tile.tile_type, TileType::Empty) || tile.is_static {
             return;
         }
         let framebuffer_size = framebuffer.size().map(|x| x as f32);
@@ -66,8 +66,12 @@ impl Render {
         let font = &**self.geng.default_font();
         let font_size = 0.05 * screen.height();
         let text = format!(
-            "{:?}: ({:.1}, {:.1})",
-            tile.tile_type, tile.velocity.x, tile.velocity.y
+            "{:?}: ({:.1}, {:.1}), tick: ({:.1}, {:.1})",
+            tile.tile_type,
+            tile.velocity.x,
+            tile.velocity.y,
+            tile.tick_velocity.x,
+            tile.tick_velocity.y
         );
         draw_2d::Text::unit(font, text, Color::WHITE)
             .scale_uniform(font_size)

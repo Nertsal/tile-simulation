@@ -11,13 +11,17 @@ impl Model {
     /// Returns the result of collision for both tiles split into all 4 directions
     /// (clock-wise starting from upwards).
     fn collide_split_impulses(
-        &self,
+        &mut self,
         tile_index: usize,
         other_index: usize,
     ) -> ([Coord; 4], [Coord; 4]) {
         if let Some((tile, other)) = self.tiles.get_two(tile_index, other_index) {
             let normal = self.get_normal(tile_index, other_index);
             let delta = solve_tile_impulses(tile, other, normal);
+            let tile = self.tiles.get_mut(tile_index).unwrap();
+            tile.tick_velocity = remove_component(tile.tick_velocity, normal);
+            let other = self.tiles.get_mut(other_index).unwrap();
+            other.tick_velocity = remove_component(other.tick_velocity, -normal);
             (add_split(Vec2::ZERO, delta), add_split(Vec2::ZERO, -delta))
         } else {
             ([Coord::ZERO; 4], [Coord::ZERO; 4])
@@ -133,6 +137,12 @@ fn collide_impulses(a: Vec2<Coord>, b: Vec2<Coord>, normal: Vec2<Coord>) -> Vec2
     // If the projection is positive, then there is basically no collision
     // since the impulses point away from each other
     normal * dot.min(Coord::ZERO) * Coord::new(0.5)
+}
+
+fn remove_component(vec: Vec2<Coord>, dir: Vec2<Coord>) -> Vec2<Coord> {
+    let dir = dir.normalize_or_zero();
+    let dot = Vec2::dot(vec, dir);
+    vec - dir * dot.max(Coord::ZERO)
 }
 
 /// Returns the rotation of the tile's edges. This is used to introduce a little bit
