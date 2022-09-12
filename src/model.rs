@@ -1,5 +1,6 @@
 use super::*;
 
+mod collision;
 mod data_array;
 mod position;
 mod tick;

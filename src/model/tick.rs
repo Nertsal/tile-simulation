@@ -133,7 +133,7 @@ impl Model {
                     // The tile wants to move out of bounds, but that is impossible.
                     // We need to subtract velocity of the tile in that out of bounds direction.
                     let position = Position::from_index(tile_index, self.get_size().x);
-                    let edge_rotation = get_tile_edge_rotation(position);
+                    let edge_rotation = collision::get_tile_edge_rotation(position);
                     let tile = self.tiles.get_mut(tile_index).unwrap();
                     let direction = direction
                         .map(|x| Coord::new(x as f32))
@@ -146,14 +146,6 @@ impl Model {
 
         // The tile either has no velocity or has been calculated to stay in place
         *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
-    }
-
-    fn collide_tiles(&mut self, tile_index: usize, other_index: usize) {
-        let tile_position = Position::from_index(tile_index, self.get_size().x);
-        let other_position = Position::from_index(other_index, self.get_size().x);
-        if let Some((tile, other)) = self.tiles.get_two_mut(tile_index, other_index) {
-            collide_tiles(tile, tile_position, other, other_position);
-        }
     }
 
     fn shift_position(&self, index: usize, direction: Vec2<isize>) -> ShiftedPosition {
@@ -215,71 +207,4 @@ enum ShiftedPosition {
     Valid(Position),
     /// The position is out of bounds of any known valid position.
     OutOfBounds,
-}
-
-/// Returns the rotation of the tile's edges. This is used to introduce a little bit
-/// of 'chaos' in the system when performing collisions.
-fn get_tile_edge_rotation(position: Position) -> R32 {
-    const EDGE_ROTATION: f32 = 0.05;
-
-    let mult = ((position.position.x + position.position.y) % 2) as f32 * 2.0 - 1.0;
-    r32(mult * EDGE_ROTATION)
-}
-
-/// Calculates tile collision and changes their velocities and tick_velocities.
-/// The tiles are not checked for adjacency, so collision checks should be done by the caller,
-/// and the difference of their positions is not normalized (which may result in weird
-/// behaviour if not accounted for by the caller).
-fn collide_tiles(
-    tile: &mut Tile,
-    tile_position: Position,
-    other: &mut Tile,
-    other_position: Position,
-) {
-    let edge_rotation = get_tile_edge_rotation(other_position);
-    let normal = (other_position.position.map(|x| Coord::new(x as f32))
-        - tile_position.position.map(|x| Coord::new(x as f32)))
-    .rotate(edge_rotation);
-
-    let tile_projection = normal * Vec2::dot(tile.velocity, normal);
-    let tile_tick_projection = normal * Vec2::dot(tile.tick_velocity, normal);
-
-    let other_projection = normal * Vec2::dot(other.velocity, normal);
-    let other_tick_projection = normal * Vec2::dot(other.tick_velocity, normal);
-
-    let relative_velocity = other.velocity - tile.velocity;
-    let relative_tick_velocity = other.tick_velocity - tile.tick_velocity;
-
-    let relative_projection = normal * Vec2::dot(relative_velocity, normal);
-    let relative_tick_projection = normal * Vec2::dot(relative_tick_velocity, normal);
-
-    // Check for static tiles
-    if other.is_static {
-        if tile.is_static {
-            return;
-        }
-        let bounciness = Coord::new(1.0 + 0.2);
-        tile.velocity -= tile_projection * bounciness;
-        tile.tick_velocity -= tile_tick_projection * bounciness;
-        return;
-    }
-    if tile.is_static {
-        if other.is_static {
-            return;
-        }
-        let bounciness = Coord::new(1.0 + 0.2);
-        other.velocity -= other_projection * bounciness;
-        other.tick_velocity -= other_tick_projection * bounciness;
-        return;
-    }
-
-    // Both tiles are not static
-    let elasticity = Coord::new(1.0);
-    let energy_loss = Coord::new(1.0 - 0.05);
-    let relative_projection = relative_projection * elasticity;
-    let relative_tick_projection = relative_tick_projection * elasticity;
-    tile.velocity = (tile.velocity + relative_projection) * energy_loss;
-    tile.tick_velocity = (tile.tick_velocity + relative_tick_projection) * energy_loss;
-    other.velocity = (other.velocity - relative_projection) * energy_loss;
-    other.tick_velocity = (other.tick_velocity - relative_tick_projection) * energy_loss;
 }

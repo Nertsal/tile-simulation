@@ -16,4 +16,14 @@ impl Position {
     pub fn to_index(self, width: usize) -> usize {
         self.position.x + self.position.y * width
     }
+
+    pub fn shift(self, delta: Vec2<isize>, width: usize) -> Option<Self> {
+        let pos = self.position.map(|x| x as isize);
+        let pos = pos + delta;
+        if pos.iter().any(|x| *x < 0 || *x >= width as isize) {
+            return None;
+        }
+        let position = pos.map(|x| x as usize);
+        Some(Self { position })
+    }
 }

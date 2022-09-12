@@ -29,6 +29,14 @@ impl<T> DataArray<T> {
         self.inner.get_mut(index)
     }
 
+    /// Attempts to get immutable access to two elemets.
+    /// Returns `None` if any of the elemets is not present.
+    pub fn get_two(&self, index: usize, other: usize) -> Option<(&T, &T)> {
+        self.inner
+            .get(index)
+            .and_then(|a| self.inner.get(other).map(|b| (a, b)))
+    }
+
     /// Attempts to get mutable access to two elemets.
     /// Returns `None` if any of the elemets is not present of if the indices are equal.
     pub fn get_two_mut(&mut self, index: usize, other: usize) -> Option<(&mut T, &mut T)> {
