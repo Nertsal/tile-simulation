@@ -11,6 +11,7 @@ pub struct Game {
     selected_tile: Tile,
     last_mouse_pos: Vec2<f64>,
     draw_velocities: bool,
+    is_paused: bool,
 }
 
 impl Game {
@@ -23,6 +24,7 @@ impl Game {
             selected_tile: Tile::empty(),
             last_mouse_pos: Vec2::ZERO,
             draw_velocities: false,
+            is_paused: false,
         }
     }
 }
@@ -66,7 +68,9 @@ impl geng::State for Game {
     }
 
     fn fixed_update(&mut self, _delta_time: f64) {
-        self.model.tick();
+        if !self.is_paused {
+            self.model.tick();
+        }
     }
 
     fn handle_event(&mut self, event: geng::Event) {
@@ -76,6 +80,8 @@ impl geng::State for Game {
                 geng::Key::Num1 => self.selected_tile = Tile::new_static(TileType::Barrier),
                 geng::Key::Num2 => self.selected_tile = Tile::new(TileType::Sand),
                 geng::Key::F1 => self.draw_velocities = !self.draw_velocities,
+                geng::Key::P => self.is_paused = !self.is_paused,
+                geng::Key::Space if self.is_paused => self.model.tick(),
                 _ => {}
             }
         }
