@@ -18,10 +18,7 @@ impl Model {
         if let Some((tile, other)) = self.tiles.get_two(tile_index, other_index) {
             let normal = self.get_normal(tile_index, other_index);
             let delta = solve_tile_impulses(tile, other, normal);
-            (
-                add_split(tile.velocity, delta),
-                add_split(other.velocity, -delta),
-            )
+            (add_split(Vec2::ZERO, delta), add_split(Vec2::ZERO, -delta))
         } else {
             ([Coord::ZERO; 4], [Coord::ZERO; 4])
         }
@@ -38,7 +35,8 @@ impl Model {
     }
 
     fn apply_deltas(&mut self, tile_index: usize, tile_deltas: [Coord; 4]) {
-        if self.tiles.get(tile_index).is_some() {
+        if let Some(tile) = self.tiles.get(tile_index) {
+            let mut tile = *tile;
             let position = Position::from_index(tile_index, self.get_size().x);
             let pos_deltas = [(0, 1), (1, 0), (0, -1), (-1, 0)].map(|(x, y)| vec2(x, y));
             let mut tile_delta = tile_deltas
@@ -48,12 +46,12 @@ impl Model {
                     acc + dir.map(|x| Coord::new(x as f32)) * *len
                 });
             for (delta, pos) in tile_deltas.iter().zip(pos_deltas) {
-                let tile_velocity = pos.map(|x| Coord::new(x as f32)) * *delta;
+                tile.velocity = pos.map(|x| Coord::new(x as f32)) * *delta;
                 if let Some(pos) = position.shift(pos, self.get_size().x) {
                     let other_index = pos.to_index(self.get_size().x);
                     let normal = self.get_normal(tile_index, other_index);
                     if let Some(other) = self.tiles.get_mut(other_index) {
-                        let delta = collide_impulses(tile_velocity, other.velocity, normal);
+                        let delta = solve_tile_impulses(&tile, other, normal);
                         tile_delta += delta;
                         other.velocity -= delta;
                     }
@@ -72,7 +70,7 @@ fn add_split(initial: Vec2<Coord>, delta: Vec2<Coord>) -> [Coord; 4] {
     let mut down = Coord::ZERO;
     let mut up = Coord::ZERO;
 
-    let coef = Coord::new(0.1);
+    let coef = Coord::new(0.5);
     if delta.x.abs() >= delta.y.abs() {
         let dy = delta.x.abs() * coef;
         down += dy;
@@ -120,7 +118,7 @@ fn solve_tile_impulses(tile: &Tile, other: &Tile, normal: Vec2<Coord>) -> Vec2<C
     if tile.is_static {
         let bounciness = Coord::new(1.0 + 0.2);
         let other_projection = normal * Vec2::dot(other.velocity, normal);
-        return -other_projection * bounciness;
+        return other_projection * bounciness;
     }
     collide_impulses(tile.velocity, other.velocity, normal)
 }
@@ -132,15 +130,15 @@ fn collide_impulses(a: Vec2<Coord>, b: Vec2<Coord>, normal: Vec2<Coord>) -> Vec2
     let normal = normal.normalize_or_zero();
     let relative = b - a;
     let dot = Vec2::dot(relative, normal);
-    // If the projection is negative, then there is basically no collision
+    // If the projection is positive, then there is basically no collision
     // since the impulses point away from each other
-    normal * dot.max(Coord::ZERO)
+    normal * dot.min(Coord::ZERO) * Coord::new(0.5)
 }
 
 /// Returns the rotation of the tile's edges. This is used to introduce a little bit
 /// of 'chaos' in the system when performing collisions.
 pub fn get_tile_edge_rotation(position: Position) -> R32 {
-    const EDGE_ROTATION: f32 = 0.05;
+    const EDGE_ROTATION: f32 = 0.00;
     let mult = ((position.position.x + position.position.y) % 2) as f32 * 2.0 - 1.0;
     r32(mult * EDGE_ROTATION)
 }
