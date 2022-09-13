@@ -40,12 +40,16 @@ impl geng::State for Game {
     }
 
     fn update(&mut self, delta_time: f64) {
-        if self
-            .geng
-            .window()
-            .is_button_pressed(geng::MouseButton::Left)
-        {
-            let position = self.geng.window().mouse_pos();
+        let window = self.geng.window();
+        let tile = if window.is_button_pressed(geng::MouseButton::Left) {
+            Some(self.selected_tile)
+        } else if window.is_button_pressed(geng::MouseButton::Right) {
+            Some(Tile::empty())
+        } else {
+            None
+        };
+        if let Some(mut tile) = tile {
+            let position = window.mouse_pos();
             let world_pos = self.render.camera.screen_to_world(
                 self.framebuffer_size.map(|x| x as f32),
                 position.map(|x| x as f32),
@@ -58,7 +62,6 @@ impl geng::State for Game {
                 let velocity =
                     (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -1.0);
                 let velocity = velocity.map(Coord::new);
-                let mut tile = self.selected_tile;
                 tile.velocity = velocity;
                 self.model.set_tile(tile_pos, tile);
             }
