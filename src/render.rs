@@ -28,14 +28,12 @@ impl Render {
     pub fn draw_model(
         &self,
         model: &Model,
-        draw_velocities: bool,
+        draw_velocities: game::VelocityVisualMode,
         framebuffer: &mut ugli::Framebuffer,
     ) {
         self.draw_grid(model, framebuffer);
         self.draw_tiles(model, framebuffer);
-        if draw_velocities {
-            self.draw_velocities(model, framebuffer);
-        }
+        self.draw_velocities(model, draw_velocities, framebuffer);
     }
 
     pub fn draw_ui(
@@ -102,12 +100,25 @@ impl Render {
         }
     }
 
-    fn draw_velocities(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
+    fn draw_velocities(
+        &self,
+        model: &Model,
+        mode: game::VelocityVisualMode,
+        framebuffer: &mut ugli::Framebuffer,
+    ) {
+        if let game::VelocityVisualMode::Off = mode {
+            return;
+        }
         for (position, tile) in model.get_tiles() {
             if matches!(tile.tile_type, TileType::Empty) || tile.physics.is_static {
                 continue;
             }
-            let len = tile.velocity.len();
+            let (velocity, color) = match mode {
+                game::VelocityVisualMode::Off => unreachable!(),
+                game::VelocityVisualMode::On => (tile.velocity, Color::BLUE),
+                game::VelocityVisualMode::Tick => (tile.tick_velocity, Color::GREEN),
+            };
+            let len = velocity.len();
             if len < Coord::new(0.1) {
                 continue;
             }
@@ -125,7 +136,7 @@ impl Render {
                 vec2(0.0, ARROW_WIDTH / 2.0),
             ];
             let transform = Mat3::translate(position) * Mat3::rotate(tile.velocity.arg().as_f32());
-            draw_2d::Polygon::new(vertices, Color::BLUE).draw_2d_transformed(
+            draw_2d::Polygon::new(vertices, color).draw_2d_transformed(
                 &self.geng,
                 framebuffer,
                 &self.camera,

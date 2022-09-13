@@ -10,8 +10,15 @@ pub struct Game {
     framebuffer_size: Vec2<usize>,
     selected_tile: Tile,
     last_mouse_pos: Vec2<f64>,
-    draw_velocities: bool,
+    draw_velocities: VelocityVisualMode,
     is_paused: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum VelocityVisualMode {
+    Off,
+    On,
+    Tick,
 }
 
 impl Game {
@@ -23,7 +30,7 @@ impl Game {
             framebuffer_size: vec2(1, 1),
             selected_tile: Tile::empty(),
             last_mouse_pos: Vec2::ZERO,
-            draw_velocities: false,
+            draw_velocities: VelocityVisualMode::Off,
             is_paused: false,
         }
     }
@@ -60,7 +67,7 @@ impl geng::State for Game {
                     self.last_mouse_pos.map(|x| x as f32),
                 );
                 let velocity =
-                    (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -1.0);
+                    (world_pos - last_mouse_pos) / delta_time as f32 / 50.0 + vec2(0.0, -0.0);
                 let velocity = velocity.map(Coord::new);
                 tile.velocity = velocity;
                 self.model.set_tile(tile_pos, tile);
@@ -100,7 +107,13 @@ impl geng::State for Game {
                         },
                     )
                 }
-                geng::Key::F1 => self.draw_velocities = !self.draw_velocities,
+                geng::Key::F1 => {
+                    self.draw_velocities = match self.draw_velocities {
+                        VelocityVisualMode::Off => VelocityVisualMode::On,
+                        VelocityVisualMode::On => VelocityVisualMode::Tick,
+                        VelocityVisualMode::Tick => VelocityVisualMode::Off,
+                    }
+                }
                 geng::Key::P => self.is_paused = !self.is_paused,
                 geng::Key::Space if self.is_paused => self.model.tick(),
                 _ => {}
