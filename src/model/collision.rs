@@ -66,6 +66,7 @@ impl Model {
     ) {
         if let Some(tile) = self.tiles.get(tile_index) {
             let mut tile = *tile;
+            tile.physics.bounciness = R32::ZERO;
             let position = Position::from_index(tile_index, self.get_size().x);
             let pos_deltas = [(0, 1), (1, 0), (0, -1), (-1, 0)].map(|(x, y)| vec2(x, y));
             let mut tile_delta = tile_deltas
@@ -135,16 +136,22 @@ fn split_impulse(delta: Vec2<Coord>, split_coefficient: R32) -> [Coord; 4] {
         right += dx;
     }
 
-    *if delta.x > Coord::ZERO {
-        &mut right
+    let forward = Coord::new(0.95);
+    let backward = Coord::ONE - forward;
+    if delta.x > Coord::ZERO {
+        right += delta.x * forward;
+        left += delta.x * backward;
     } else {
-        &mut left
-    } += delta.x.abs();
-    *if delta.y > Coord::ZERO {
-        &mut up
+        left -= delta.x * forward;
+        right -= delta.x * backward;
+    }
+    if delta.y > Coord::ZERO {
+        up += delta.y * forward;
+        down += delta.y * backward;
     } else {
-        &mut down
-    } += delta.y.abs();
+        down -= delta.y * forward;
+        up -= delta.y * backward;
+    }
 
     [up, right, down, left]
 }
