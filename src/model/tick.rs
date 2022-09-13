@@ -89,7 +89,7 @@ impl Model {
         }
 
         // Check if the tile is static
-        if tile.is_static {
+        if tile.physics.is_static {
             *calculation.state.get_mut(tile_index).unwrap() = TileMoveInfo::Static;
             return;
         }

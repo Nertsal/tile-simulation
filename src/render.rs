@@ -57,7 +57,7 @@ impl Render {
     }
 
     fn draw_tile_info(&self, tile: &Tile, framebuffer: &mut ugli::Framebuffer) {
-        if matches!(tile.tile_type, TileType::Empty) || tile.is_static {
+        if matches!(tile.tile_type, TileType::Empty) || tile.physics.is_static {
             return;
         }
         let framebuffer_size = framebuffer.size().map(|x| x as f32);
@@ -104,7 +104,7 @@ impl Render {
 
     fn draw_velocities(&self, model: &Model, framebuffer: &mut ugli::Framebuffer) {
         for (position, tile) in model.get_tiles() {
-            if matches!(tile.tile_type, TileType::Empty) || tile.is_static {
+            if matches!(tile.tile_type, TileType::Empty) || tile.physics.is_static {
                 continue;
             }
             let len = tile.velocity.len();

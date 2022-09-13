@@ -18,8 +18,20 @@ impl Model {
     ) -> ([Coord; 4], [Coord; 4], [Coord; 4], [Coord; 4]) {
         if let Some((tile, other)) = self.tiles.get_two(tile_index, other_index) {
             let normal = self.get_normal(tile_index, other_index);
-            let delta = solve_tile_impulses(tile, other, normal);
-            let tick_delta = solve_tile_tick_impulses(tile, other, normal);
+            let delta = solve_tile_impulses(
+                tile.velocity,
+                tile.physics,
+                other.velocity,
+                other.physics,
+                normal,
+            );
+            let tick_delta = solve_tile_impulses(
+                tile.tick_velocity,
+                tile.physics,
+                other.tick_velocity,
+                other.physics,
+                normal,
+            );
             (
                 split_impulse(delta),
                 split_impulse(-delta),
@@ -77,11 +89,23 @@ impl Model {
                     let other_index = pos.to_index(self.get_size().x);
                     let normal = self.get_normal(tile_index, other_index);
                     if let Some(other) = self.tiles.get_mut(other_index) {
-                        let delta = solve_tile_impulses(&tile, other, normal);
+                        let delta = solve_tile_impulses(
+                            tile.velocity,
+                            tile.physics,
+                            other.velocity,
+                            other.physics,
+                            normal,
+                        );
                         tile_delta += delta;
                         other.velocity -= delta;
 
-                        let tick_delta = solve_tile_tick_impulses(&tile, other, normal);
+                        let tick_delta = solve_tile_impulses(
+                            tile.tick_velocity,
+                            tile.physics,
+                            other.tick_velocity,
+                            other.physics,
+                            normal,
+                        );
                         tile_tick_delta += tick_delta;
                         other.tick_velocity -= tick_delta;
                     }
@@ -126,38 +150,27 @@ fn split_impulse(delta: Vec2<Coord>) -> [Coord; 4] {
     [up, right, down, left]
 }
 
-fn solve_tile_impulses(tile: &Tile, other: &Tile, normal: Vec2<Coord>) -> Vec2<Coord> {
-    if tile.is_static && other.is_static {
+fn solve_tile_impulses(
+    tile_velocity: Vec2<Coord>,
+    tile_physics: TilePhysics,
+    other_velocity: Vec2<Coord>,
+    other_physics: TilePhysics,
+    normal: Vec2<Coord>,
+) -> Vec2<Coord> {
+    if tile_physics.is_static && other_physics.is_static {
         return Vec2::ZERO;
     }
-    if other.is_static {
-        let bounciness = Coord::new(1.0 + 0.2);
-        let tile_projection = normal * Vec2::dot(tile.velocity, normal);
+    if other_physics.is_static {
+        let bounciness = Coord::ONE + tile_physics.bounciness;
+        let tile_projection = normal * Vec2::dot(tile_velocity, normal);
         return -tile_projection * bounciness;
     }
-    if tile.is_static {
-        let bounciness = Coord::new(1.0 + 0.2);
-        let other_projection = normal * Vec2::dot(other.velocity, normal);
+    if tile_physics.is_static {
+        let bounciness = Coord::ONE + other_physics.bounciness;
+        let other_projection = normal * Vec2::dot(other_velocity, normal);
         return other_projection * bounciness;
     }
-    collide_impulses(tile.velocity, other.velocity, normal)
-}
-
-fn solve_tile_tick_impulses(tile: &Tile, other: &Tile, normal: Vec2<Coord>) -> Vec2<Coord> {
-    if tile.is_static && other.is_static {
-        return Vec2::ZERO;
-    }
-    if other.is_static {
-        let bounciness = Coord::new(1.0 + 0.2);
-        let tile_projection = normal * Vec2::dot(tile.tick_velocity, normal);
-        return -tile_projection * bounciness;
-    }
-    if tile.is_static {
-        let bounciness = Coord::new(1.0 + 0.2);
-        let other_projection = normal * Vec2::dot(other.tick_velocity, normal);
-        return other_projection * bounciness;
-    }
-    collide_impulses(tile.tick_velocity, other.tick_velocity, normal)
+    collide_impulses(tile_velocity, other_velocity, normal)
 }
 
 /// Given the impulses of two collided bodies and the collision normal,
