@@ -86,6 +86,7 @@ impl geng::State for Game {
                         TilePhysics {
                             is_static: true,
                             bounciness: R32::ZERO,
+                            impulse_split: R32::ZERO,
                         },
                     )
                 }
@@ -95,6 +96,7 @@ impl geng::State for Game {
                         TilePhysics {
                             is_static: false,
                             bounciness: r32(0.1),
+                            impulse_split: r32(1.0),
                         },
                     )
                 }

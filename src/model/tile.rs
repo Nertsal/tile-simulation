@@ -15,6 +15,8 @@ pub struct TilePhysics {
     pub is_static: bool,
     /// How much energy is preserved when bounced from a static tile.
     pub bounciness: R32,
+    /// Impulse split coefficient determines how impulse gets redirected.
+    pub impulse_split: R32,
 }
 
 /// Purely decorative information.
@@ -41,6 +43,7 @@ impl Tile {
             TilePhysics {
                 is_static: false,
                 bounciness: R32::ZERO,
+                impulse_split: R32::ZERO,
             },
         )
     }

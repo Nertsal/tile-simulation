@@ -33,10 +33,10 @@ impl Model {
                 normal,
             );
             (
-                split_impulse(delta),
-                split_impulse(-delta),
-                split_impulse(tick_delta),
-                split_impulse(-tick_delta),
+                split_impulse(delta, tile.physics.impulse_split),
+                split_impulse(-delta, other.physics.impulse_split),
+                split_impulse(tick_delta, tile.physics.impulse_split),
+                split_impulse(-tick_delta, other.physics.impulse_split),
             )
         } else {
             (
@@ -119,19 +119,18 @@ impl Model {
 }
 
 /// Splits the given impulse into all 4 directions.
-fn split_impulse(delta: Vec2<Coord>) -> [Coord; 4] {
+fn split_impulse(delta: Vec2<Coord>, split_coefficient: R32) -> [Coord; 4] {
     let mut left = Coord::ZERO;
     let mut right = Coord::ZERO;
     let mut down = Coord::ZERO;
     let mut up = Coord::ZERO;
 
-    let coef = Coord::new(1.0);
     if delta.x.abs() >= delta.y.abs() {
-        let dy = delta.x.abs() * coef;
+        let dy = delta.x.abs() * split_coefficient;
         down += dy;
         up += dy;
     } else {
-        let dx = delta.y.abs() * coef;
+        let dx = delta.y.abs() * split_coefficient;
         left += dx;
         right += dx;
     }
