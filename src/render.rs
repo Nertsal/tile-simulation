@@ -164,6 +164,6 @@ fn tile_color(tile: TileType) -> Color<f32> {
     match tile {
         TileType::Empty => Color::TRANSPARENT_BLACK,
         TileType::Barrier => Color::WHITE,
-        TileType::Sand => Color::YELLOW,
+        TileType::Water => Color::rgb(0.0, 0.5, 0.9),
     }
 }

@@ -14,7 +14,7 @@ pub struct Tile {
 pub enum TileType {
     Empty,
     Barrier,
-    Sand,
+    Water,
 }
 
 impl Tile {

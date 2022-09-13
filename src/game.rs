@@ -81,7 +81,7 @@ impl geng::State for Game {
             match key {
                 geng::Key::Num0 => self.selected_tile = Tile::empty(),
                 geng::Key::Num1 => self.selected_tile = Tile::new_static(TileType::Barrier),
-                geng::Key::Num2 => self.selected_tile = Tile::new(TileType::Sand),
+                geng::Key::Num2 => self.selected_tile = Tile::new(TileType::Water),
                 geng::Key::F1 => self.draw_velocities = !self.draw_velocities,
                 geng::Key::P => self.is_paused = !self.is_paused,
                 geng::Key::Space if self.is_paused => self.model.tick(),

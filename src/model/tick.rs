@@ -11,7 +11,7 @@ impl Model {
             let gravity_scale = match tile.tile_type {
                 TileType::Empty => 0.0,
                 TileType::Barrier => 0.0,
-                TileType::Sand => 1.0,
+                TileType::Water => 1.0,
             };
             let gravity = (GRAVITY * gravity_scale).map(Coord::new);
             tile.velocity += gravity;
