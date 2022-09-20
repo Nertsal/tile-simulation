@@ -92,6 +92,7 @@ impl geng::State for Game {
                         TileType::Barrier,
                         TilePhysics {
                             is_static: true,
+                            gravity_scale: r32(1.0),
                             bounciness: R32::ZERO,
                             impulse_split: R32::ZERO,
                         },
@@ -102,6 +103,18 @@ impl geng::State for Game {
                         TileType::Water,
                         TilePhysics {
                             is_static: false,
+                            gravity_scale: r32(1.0),
+                            bounciness: r32(0.1),
+                            impulse_split: r32(1.0),
+                        },
+                    )
+                }
+                geng::Key::Num3 => {
+                    self.selected_tile = Tile::new(
+                        TileType::Steam,
+                        TilePhysics {
+                            is_static: false,
+                            gravity_scale: r32(-1.0),
                             bounciness: r32(0.1),
                             impulse_split: r32(1.0),
                         },

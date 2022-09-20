@@ -176,5 +176,6 @@ fn tile_color(tile: TileType) -> Color<f32> {
         TileType::Empty => Color::TRANSPARENT_BLACK,
         TileType::Barrier => Color::WHITE,
         TileType::Water => Color::rgb(0.0, 0.5, 0.9),
+        TileType::Steam => Color::rgb(0.6, 0.6, 0.6),
     }
 }

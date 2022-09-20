@@ -13,6 +13,7 @@ pub struct Tile {
 pub struct TilePhysics {
     /// Indicates that the tile cannot move.
     pub is_static: bool,
+    pub gravity_scale: R32,
     /// How much energy is preserved when bounced from a static tile.
     pub bounciness: R32,
     /// Impulse split coefficient determines how impulse gets redirected.
@@ -25,6 +26,7 @@ pub enum TileType {
     Empty,
     Barrier,
     Water,
+    Steam,
 }
 
 impl Tile {
@@ -42,6 +44,7 @@ impl Tile {
             TileType::Empty,
             TilePhysics {
                 is_static: false,
+                gravity_scale: r32(0.0),
                 bounciness: R32::ZERO,
                 impulse_split: R32::ZERO,
             },

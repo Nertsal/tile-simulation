@@ -8,12 +8,7 @@ impl Model {
 
     fn apply_gravity(&mut self) {
         for tile in self.tiles.iter_mut() {
-            let gravity_scale = match tile.tile_type {
-                TileType::Empty => 0.0,
-                TileType::Barrier => 0.0,
-                TileType::Water => 1.0,
-            };
-            let gravity = (GRAVITY * gravity_scale).map(Coord::new);
+            let gravity = GRAVITY.map(Coord::new) * tile.physics.gravity_scale;
             tile.velocity += gravity;
         }
     }
